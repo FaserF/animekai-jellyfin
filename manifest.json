@@ -1,0 +1,11 @@
+[
+  {
+    "guid": "aaf63d7c-95e2-4cda-a6fc-7fbea2b90f8a",
+    "name": "Re:Zero Perfect Run",
+    "description": "Seamlessly integrates Re:Zero - The Perfect Run into Jellyfin as an official-grade Special Season with zero local storage overhead via dynamic .strm and .nfo streaming synchronization.",
+    "overview": "Dynamic HLS & direct MP4 streaming bridge and automated episode updater for Re:Zero Perfect Run.",
+    "owner": "FaserF",
+    "category": "Live TV & Streaming",
+    "versions": []
+  }
+]

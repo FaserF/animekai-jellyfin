@@ -1,0 +1,27 @@
+backend:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'Jellyfin.Plugin.Rezero/**/*.cs'
+          - 'Jellyfin.Plugin.Rezero/Jellyfin.Plugin.Rezero.csproj'
+
+frontend:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'Jellyfin.Plugin.Rezero/Features/Script/**/*.js'
+          - 'Jellyfin.Plugin.Rezero/Configuration/**/*.html'
+
+tests:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'Jellyfin.Plugin.Rezero.Tests/**/*'
+
+ci-cd:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/**/*'
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '*.md'
+          - 'docs/**/*'

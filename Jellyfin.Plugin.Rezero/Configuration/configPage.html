@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Re:Zero Perfect Run</title>
+</head>
+<body>
+    <div id="RezeroConfigurationPage" data-role="page" class="page type-interior pluginConfigurationPage" data-controller="__plugin/RezeroConfigurationPage.js">
+        <div data-role="content">
+            <div class="content-primary">
+                <form id="rezeroConfigForm">
+                    <div class="sectionTitleContainer flex align-items-center">
+                        <h2 class="sectionTitle">Re:Zero Perfect Run Configuration</h2>
+                    </div>
+                    <p class="fieldDescription">
+                        Automatically synchronizes the fan-made re-cut <em>Re:Zero - The Perfect Run</em> directly into Jellyfin as an official Special Season via zero-byte streaming pointers (.strm) and rich metadata (.nfo).
+                    </p>
+
+                    <div class="verticalSection">
+                        <h2>Synchronization &amp; Storage</h2>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="txtTargetSeriesPath">Target Series Directory</label>
+                            <input is="emby-input" type="text" id="txtTargetSeriesPath" name="TargetSeriesPath" class="emby-input" />
+                            <div class="fieldDescription">Leave blank to automatically discover the existing Re:Zero series in your TV libraries.</div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="txtSeasonFolder">Season Folder Name</label>
+                            <input is="emby-input" type="text" id="txtSeasonFolder" name="SeasonFolder" class="emby-input" value="Season 00" />
+                            <div class="fieldDescription">Default: "Season 00" (Specials).</div>
+                        </div>
+
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input is="emby-checkbox" type="checkbox" id="chkEnableAutoSync" name="EnableAutoSync" />
+                                <span>Enable Automated Background Synchronization</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">Polls the official rezeroperfect.run API for newly added arcs, episodes, or re-edits.</div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="txtSyncIntervalHours">Sync Interval (Hours)</label>
+                            <input is="emby-input" type="number" id="txtSyncIntervalHours" name="SyncIntervalHours" class="emby-input" min="1" max="168" value="12" />
+                        </div>
+                    </div>
+
+                    <div class="verticalSection">
+                        <h2>Audio &amp; Subtitle Preferences</h2>
+                        <div class="selectContainer">
+                            <label class="selectLabel" for="selectPreferredLanguage">Audio Language</label>
+                            <select is="emby-select" id="selectPreferredLanguage" name="PreferredLanguage" class="emby-select">
+                                <option value="jp">Japanese (Original Cast)</option>
+                                <option value="en">English (Dub)</option>
+                                <option value="both">Both (Generate separate version files)</option>
+                            </select>
+                        </div>
+
+                        <div class="selectContainer">
+                            <label class="selectLabel" for="selectPreferredCaptions">Subtitles / Captions</label>
+                            <select is="emby-select" id="selectPreferredCaptions" name="PreferredCaptions" class="emby-select">
+                                <option value="cc">Hardcoded English Subtitles (Burned CC)</option>
+                                <option value="off">Clean (No Subtitles)</option>
+                                <option value="both">Both (Generate separate version files)</option>
+                            </select>
+                        </div>
+
+                        <div class="selectContainer">
+                            <label class="selectLabel" for="selectPreferredQuality">Stream Quality</label>
+                            <select is="emby-select" id="selectPreferredQuality" name="PreferredQuality" class="emby-select">
+                                <option value="1080p">1080p (Full HD)</option>
+                                <option value="720p">720p (HD)</option>
+                                <option value="480p">480p (SD)</option>
+                            </select>
+                        </div>
+
+                        <div class="selectContainer">
+                            <label class="selectLabel" for="selectStreamFormat">Streaming Format</label>
+                            <select is="emby-select" id="selectStreamFormat" name="StreamFormat" class="emby-select">
+                                <option value="direct_mp4">Direct MP4 (Universal Direct Play without transcoding)</option>
+                                <option value="hls_m3u8">HLS (.m3u8 adaptive live stream)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="verticalSection">
+                        <h2>Sync Status &amp; Manual Run</h2>
+                        <p id="lblSyncStatus" style="font-weight: 500; color: #00a4dc;">Loading status...</p>
+                        <button is="emby-button" type="button" class="raised button-submit" id="btnManualSync">
+                            <span>Sync Streaming Episodes Now</span>
+                        </button>
+                    </div>
+
+                    <div class="verticalSection">
+                        <h2>Recent Upstream Updates</h2>
+                        <div id="updatesContainer" style="background: rgba(0,0,0,0.2); padding: 1em; border-radius: 8px;">
+                            <p>Loading updates log...</p>
+                        </div>
+                    </div>
+
+                    <button is="emby-button" type="submit" class="raised button-submit block">
+                        <span>Save Configuration</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <script type="text/javascript">
+            var pluginId = "aaf63d7c-95e2-4cda-a6fc-7fbea2b90f8a";
+
+            function loadConfig(page) {
+                Dashboard.showLoadingMsg();
+                ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                    page.querySelector("#txtTargetSeriesPath").value = config.TargetSeriesPath || "";
+                    page.querySelector("#txtSeasonFolder").value = config.SeasonFolder || "Season 00";
+                    page.querySelector("#chkEnableAutoSync").checked = config.EnableAutoSync !== false;
+                    page.querySelector("#txtSyncIntervalHours").value = config.SyncIntervalHours || 12;
+                    page.querySelector("#selectPreferredLanguage").value = config.PreferredLanguage || "jp";
+                    page.querySelector("#selectPreferredCaptions").value = config.PreferredCaptions || "cc";
+                    page.querySelector("#selectPreferredQuality").value = config.PreferredQuality || "1080p";
+                    page.querySelector("#selectStreamFormat").value = config.StreamFormat || "direct_mp4";
+                    Dashboard.hideLoadingMsg();
+                });
+
+                ApiClient.getJSON(ApiClient.getUrl("Rezero/Status")).then(function (status) {
+                    var statusEl = page.querySelector("#lblSyncStatus");
+                    var lastSync = status.lastSyncUtc ? new Date(status.lastSyncUtc).toLocaleString() : "Never";
+                    statusEl.innerHTML = "<strong>Status:</strong> " + (status.lastSyncStatus || "Idle") +
+                        "<br><strong>Episodes Synced:</strong> " + (status.totalSyncedEpisodes || 0) +
+                        "<br><strong>Series Path:</strong> " + (status.seriesPath || "Auto-detecting...") +
+                        "<br><strong>Last Sync:</strong> " + lastSync;
+                }).catch(function() {});
+
+                ApiClient.getJSON(ApiClient.getUrl("Rezero/Updates")).then(function (updates) {
+                    var container = page.querySelector("#updatesContainer");
+                    if (!updates || updates.length === 0) {
+                        container.innerHTML = "<p>No recent updates found.</p>";
+                        return;
+                    }
+                    var html = "<ul style='padding-left: 20px;'>";
+                    updates.slice(0, 5).forEach(function(u) {
+                        html += "<li><strong>" + u.date + " - " + u.title + "</strong><ul>";
+                        (u.changes || []).forEach(function(c) {
+                            html += "<li><em>[" + c.type + "]</em> " + c.text + "</li>";
+                        });
+                        html += "</ul></li>";
+                    });
+                    html += "</ul>";
+                    container.innerHTML = html;
+                }).catch(function() {
+                    page.querySelector("#updatesContainer").innerHTML = "<p>Unable to load updates log.</p>";
+                });
+            }
+
+            document.querySelector("#RezeroConfigurationPage").addEventListener("pageshow", function () {
+                var page = this;
+                loadConfig(page);
+
+                page.querySelector("#rezeroConfigForm").addEventListener("submit", function (e) {
+                    e.preventDefault();
+                    Dashboard.showLoadingMsg();
+                    ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                        config.TargetSeriesPath = page.querySelector("#txtTargetSeriesPath").value;
+                        config.SeasonFolder = page.querySelector("#txtSeasonFolder").value;
+                        config.EnableAutoSync = page.querySelector("#chkEnableAutoSync").checked;
+                        config.SyncIntervalHours = parseInt(page.querySelector("#txtSyncIntervalHours").value, 10) || 12;
+                        config.PreferredLanguage = page.querySelector("#selectPreferredLanguage").value;
+                        config.PreferredCaptions = page.querySelector("#selectPreferredCaptions").value;
+                        config.PreferredQuality = page.querySelector("#selectPreferredQuality").value;
+                        config.StreamFormat = page.querySelector("#selectStreamFormat").value;
+
+                        ApiClient.updatePluginConfiguration(pluginId, config).then(function (result) {
+                            Dashboard.processPluginConfigurationUpdateResult(result);
+                        });
+                    });
+                    return false;
+                });
+
+                page.querySelector("#btnManualSync").addEventListener("click", function () {
+                    Dashboard.showLoadingMsg();
+                    ApiClient.ajax({
+                        type: "POST",
+                        url: ApiClient.getUrl("Rezero/Sync")
+                    }).then(function (res) {
+                        Dashboard.hideLoadingMsg();
+                        Dashboard.alert({ message: res.message || "Synchronization finished." });
+                        loadConfig(page);
+                    }).catch(function (err) {
+                        Dashboard.hideLoadingMsg();
+                        Dashboard.alert({ message: "Sync failed: " + (err.message || err) });
+                    });
+                });
+            });
+        </script>
+    </div>
+</body>
+</html>
