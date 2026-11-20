@@ -13,34 +13,78 @@
                         <h2 class="sectionTitle">Re:Zero Perfect Run Configuration</h2>
                     </div>
                     <p class="fieldDescription">
-                        Automatically synchronizes the fan-made re-cut <em>Re:Zero - The Perfect Run</em> directly into Jellyfin as an official Special Season via zero-byte streaming pointers (.strm) and rich metadata (.nfo).
+                        Universally integrates the fan-made re-cut <em>Re:Zero - The Perfect Run</em> into Jellyfin. Supports either an official-looking Special Season (Season 00) attached to an existing series, or an independent Standalone Series in any anime/TV library with dynamic in-player multi-quality switching.
                     </p>
 
                     <div class="verticalSection">
-                        <h2>Synchronization &amp; Storage</h2>
-                        <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="txtTargetSeriesPath">Target Series Directory</label>
+                        <h2>Integration Mode &amp; Library Structure</h2>
+                        <div class="selectContainer">
+                            <label class="selectLabel" for="selectIntegrationMode">Integration Mode</label>
+                            <select is="emby-select" id="selectIntegrationMode" name="IntegrationMode" class="emby-select">
+                                <option value="SpecialSeason">Special Season (Attach as Season 00/Specials to existing Re:Zero)</option>
+                                <option value="StandaloneSeries">Standalone Show (Create "Re:Zero - The Perfect Run" as its own series)</option>
+                            </select>
+                            <div class="fieldDescription">Choose how Re:Zero Perfect Run appears in your Jellyfin media libraries.</div>
+                        </div>
+
+                        <div class="inputContainer" id="containerTargetSeriesPath">
+                            <label class="inputLabel inputLabelUnfocused" for="txtTargetSeriesPath">Custom Series Directory (Optional)</label>
                             <input is="emby-input" type="text" id="txtTargetSeriesPath" name="TargetSeriesPath" class="emby-input" />
-                            <div class="fieldDescription">Leave blank to automatically discover the existing Re:Zero series in your TV libraries.</div>
+                            <div class="fieldDescription">Leave blank to auto-detect the existing Re:Zero series in your TV libraries.</div>
+                        </div>
+
+                        <div class="inputContainer" id="containerStandaloneLibraryPath" style="display: none;">
+                            <label class="inputLabel inputLabelUnfocused" for="txtStandaloneLibraryPath">Target TV/Anime Library Folder</label>
+                            <input is="emby-input" type="text" id="txtStandaloneLibraryPath" name="StandaloneLibraryPath" class="emby-input" />
+                            <div class="fieldDescription">Path to the library root folder where the standalone series folder will be created.</div>
                         </div>
 
                         <div class="inputContainer">
                             <label class="inputLabel inputLabelUnfocused" for="txtSeasonFolder">Season Folder Name</label>
                             <input is="emby-input" type="text" id="txtSeasonFolder" name="SeasonFolder" class="emby-input" value="Season 00" />
-                            <div class="fieldDescription">Default: "Season 00" (Specials).</div>
+                            <div class="fieldDescription">Directory name inside the series (e.g. "Season 00" or "Specials").</div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="txtSeasonNumber">Season Number</label>
+                            <input is="emby-input" type="number" id="txtSeasonNumber" name="SeasonNumber" class="emby-input" value="0" />
+                            <div class="fieldDescription">Season index in metadata (0 = Specials).</div>
+                        </div>
+                    </div>
+
+                    <div class="verticalSection">
+                        <h2>Video Qualities &amp; In-Player Resolution Selection</h2>
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input is="emby-checkbox" type="checkbox" id="chkOfferAllQualitiesInPlayer" name="OfferAllQualitiesInPlayer" checked />
+                                <span>Offer All Qualities in Jellyfin Player (1080p, 720p, 480p)</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">Dynamically supplies all available video resolutions to Jellyfin client players via IMediaSourceProvider, lighting up the Version/Quality dropdown without needing duplicate files.</div>
                         </div>
 
                         <div class="checkboxContainer checkboxContainer-withDescription">
                             <label class="emby-checkbox-label">
-                                <input is="emby-checkbox" type="checkbox" id="chkEnableAutoSync" name="EnableAutoSync" />
-                                <span>Enable Automated Background Synchronization</span>
+                                <input is="emby-checkbox" type="checkbox" id="chkEnableMultiVersionFiles" name="EnableMultiVersionFiles" />
+                                <span>Generate Multi-Version .strm Files on Disk</span>
                             </label>
-                            <div class="fieldDescription checkboxFieldDescription">Polls the official rezeroperfect.run API for newly added arcs, episodes, or re-edits.</div>
+                            <div class="fieldDescription checkboxFieldDescription">Writes separate physical .strm files for 1080p, 720p, and 480p on disk for native Jellyfin version grouping.</div>
                         </div>
 
-                        <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="txtSyncIntervalHours">Sync Interval (Hours)</label>
-                            <input is="emby-input" type="number" id="txtSyncIntervalHours" name="SyncIntervalHours" class="emby-input" min="1" max="168" value="12" />
+                        <div class="selectContainer">
+                            <label class="selectLabel" for="selectPreferredQuality">Default Video Quality</label>
+                            <select is="emby-select" id="selectPreferredQuality" name="PreferredQuality" class="emby-select">
+                                <option value="1080p">1080p (Full HD)</option>
+                                <option value="720p">720p (HD)</option>
+                                <option value="480p">480p (SD)</option>
+                            </select>
+                        </div>
+
+                        <div class="selectContainer">
+                            <label class="selectLabel" for="selectStreamFormat">Primary Streaming Container</label>
+                            <select is="emby-select" id="selectStreamFormat" name="StreamFormat" class="emby-select">
+                                <option value="direct_mp4">Direct MP4 (Universal Direct Play without transcoding)</option>
+                                <option value="hls_m3u8">HLS (.m3u8 adaptive live stream)</option>
+                            </select>
                         </div>
                     </div>
 
@@ -63,22 +107,27 @@
                                 <option value="both">Both (Generate separate version files)</option>
                             </select>
                         </div>
+                    </div>
 
-                        <div class="selectContainer">
-                            <label class="selectLabel" for="selectPreferredQuality">Stream Quality</label>
-                            <select is="emby-select" id="selectPreferredQuality" name="PreferredQuality" class="emby-select">
-                                <option value="1080p">1080p (Full HD)</option>
-                                <option value="720p">720p (HD)</option>
-                                <option value="480p">480p (SD)</option>
-                            </select>
+                    <div class="verticalSection">
+                        <h2>Automation &amp; Endpoints</h2>
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input is="emby-checkbox" type="checkbox" id="chkEnableAutoSync" name="EnableAutoSync" checked />
+                                <span>Enable Automated Background Synchronization</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">Polls the upstream API for new releases and re-edited episodes.</div>
                         </div>
 
-                        <div class="selectContainer">
-                            <label class="selectLabel" for="selectStreamFormat">Streaming Format</label>
-                            <select is="emby-select" id="selectStreamFormat" name="StreamFormat" class="emby-select">
-                                <option value="direct_mp4">Direct MP4 (Universal Direct Play without transcoding)</option>
-                                <option value="hls_m3u8">HLS (.m3u8 adaptive live stream)</option>
-                            </select>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="txtSyncIntervalHours">Sync Interval (Hours)</label>
+                            <input is="emby-input" type="number" id="txtSyncIntervalHours" name="SyncIntervalHours" class="emby-input" min="1" max="168" value="12" />
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="txtApiBaseUrl">API Base URL</label>
+                            <input is="emby-input" type="text" id="txtApiBaseUrl" name="ApiBaseUrl" class="emby-input" value="https://rezeroperfect.run/" />
+                            <div class="fieldDescription">Customizable if hosting a local cache, proxy, or mirror.</div>
                         </div>
                     </div>
 
@@ -107,17 +156,37 @@
         <script type="text/javascript">
             var pluginId = "aaf63d7c-95e2-4cda-a6fc-7fbea2b90f8a";
 
+            function updateModeVisibility(mode) {
+                var targetSeriesContainer = document.querySelector("#containerTargetSeriesPath");
+                var standaloneContainer = document.querySelector("#containerStandaloneLibraryPath");
+                if (mode === "StandaloneSeries") {
+                    targetSeriesContainer.style.display = "none";
+                    standaloneContainer.style.display = "block";
+                } else {
+                    targetSeriesContainer.style.display = "block";
+                    standaloneContainer.style.display = "none";
+                }
+            }
+
             function loadConfig(page) {
                 Dashboard.showLoadingMsg();
                 ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                    page.querySelector("#selectIntegrationMode").value = config.IntegrationMode || "SpecialSeason";
                     page.querySelector("#txtTargetSeriesPath").value = config.TargetSeriesPath || "";
+                    page.querySelector("#txtStandaloneLibraryPath").value = config.StandaloneLibraryPath || "";
                     page.querySelector("#txtSeasonFolder").value = config.SeasonFolder || "Season 00";
+                    page.querySelector("#txtSeasonNumber").value = config.SeasonNumber !== undefined ? config.SeasonNumber : 0;
+                    page.querySelector("#chkOfferAllQualitiesInPlayer").checked = config.OfferAllQualitiesInPlayer !== false;
+                    page.querySelector("#chkEnableMultiVersionFiles").checked = config.EnableMultiVersionFiles === true;
                     page.querySelector("#chkEnableAutoSync").checked = config.EnableAutoSync !== false;
                     page.querySelector("#txtSyncIntervalHours").value = config.SyncIntervalHours || 12;
                     page.querySelector("#selectPreferredLanguage").value = config.PreferredLanguage || "jp";
                     page.querySelector("#selectPreferredCaptions").value = config.PreferredCaptions || "cc";
                     page.querySelector("#selectPreferredQuality").value = config.PreferredQuality || "1080p";
                     page.querySelector("#selectStreamFormat").value = config.StreamFormat || "direct_mp4";
+                    page.querySelector("#txtApiBaseUrl").value = config.ApiBaseUrl || "https://rezeroperfect.run/";
+
+                    updateModeVisibility(config.IntegrationMode || "SpecialSeason");
                     Dashboard.hideLoadingMsg();
                 });
 
@@ -155,18 +224,28 @@
                 var page = this;
                 loadConfig(page);
 
+                page.querySelector("#selectIntegrationMode").addEventListener("change", function () {
+                    updateModeVisibility(this.value);
+                });
+
                 page.querySelector("#rezeroConfigForm").addEventListener("submit", function (e) {
                     e.preventDefault();
                     Dashboard.showLoadingMsg();
                     ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                        config.IntegrationMode = page.querySelector("#selectIntegrationMode").value;
                         config.TargetSeriesPath = page.querySelector("#txtTargetSeriesPath").value;
+                        config.StandaloneLibraryPath = page.querySelector("#txtStandaloneLibraryPath").value;
                         config.SeasonFolder = page.querySelector("#txtSeasonFolder").value;
+                        config.SeasonNumber = parseInt(page.querySelector("#txtSeasonNumber").value, 10) || 0;
+                        config.OfferAllQualitiesInPlayer = page.querySelector("#chkOfferAllQualitiesInPlayer").checked;
+                        config.EnableMultiVersionFiles = page.querySelector("#chkEnableMultiVersionFiles").checked;
                         config.EnableAutoSync = page.querySelector("#chkEnableAutoSync").checked;
                         config.SyncIntervalHours = parseInt(page.querySelector("#txtSyncIntervalHours").value, 10) || 12;
                         config.PreferredLanguage = page.querySelector("#selectPreferredLanguage").value;
                         config.PreferredCaptions = page.querySelector("#selectPreferredCaptions").value;
                         config.PreferredQuality = page.querySelector("#selectPreferredQuality").value;
                         config.StreamFormat = page.querySelector("#selectStreamFormat").value;
+                        config.ApiBaseUrl = page.querySelector("#txtApiBaseUrl").value;
 
                         ApiClient.updatePluginConfiguration(pluginId, config).then(function (result) {
                             Dashboard.processPluginConfigurationUpdateResult(result);

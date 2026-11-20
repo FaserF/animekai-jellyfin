@@ -14,7 +14,8 @@ using Microsoft.Extensions.Logging;
 namespace Jellyfin.Plugin.Rezero.Services;
 
 /// <summary>
-/// Core implementation of the Re:Zero Perfect Run streaming synchronizer.
+/// Universal implementation of the Re:Zero Perfect Run streaming synchronizer.
+/// Supports both Special Season integration and Standalone Series creation across any environment.
 /// </summary>
 public class RezeroSyncService : IRezeroSyncService
 {
@@ -48,13 +49,32 @@ public class RezeroSyncService : IRezeroSyncService
         }
 
         var seriesPath = ResolveSeriesPath();
-        if (string.IsNullOrWhiteSpace(seriesPath) || !Directory.Exists(seriesPath))
+        if (string.IsNullOrWhiteSpace(seriesPath))
         {
-            var msg = $"Target series path not found or unreachable: '{seriesPath}'. Configure TargetSeriesPath in plugin settings.";
+            var msg = "Target series path could not be resolved. Configure TargetSeriesPath or StandaloneLibraryPath in settings.";
             _logger.LogWarning(msg);
             config.LastSyncStatus = msg;
             Plugin.Instance?.SaveConfiguration();
             return 0;
+        }
+
+        if (!Directory.Exists(seriesPath))
+        {
+            Directory.CreateDirectory(seriesPath);
+            _logger.LogInformation("Created target series directory: {Path}", seriesPath);
+        }
+
+        // If Standalone Series mode, create tvshow.nfo if not present
+        var isStandalone = string.Equals(config.IntegrationMode, "StandaloneSeries", StringComparison.OrdinalIgnoreCase);
+        if (isStandalone)
+        {
+            var tvshowNfoPath = Path.Combine(seriesPath, "tvshow.nfo");
+            if (!File.Exists(tvshowNfoPath))
+            {
+                var title = string.IsNullOrWhiteSpace(config.StandaloneSeriesTitle) ? "Re:Zero - The Perfect Run" : config.StandaloneSeriesTitle;
+                var tvshowNfo = BuildTvShowNfo(title);
+                await File.WriteAllTextAsync(tvshowNfoPath, tvshowNfo, Encoding.UTF8, cancellationToken).ConfigureAwait(false);
+            }
         }
 
         var seasonFolder = string.IsNullOrWhiteSpace(config.SeasonFolder) ? "Season 00" : config.SeasonFolder;
@@ -62,7 +82,7 @@ public class RezeroSyncService : IRezeroSyncService
         if (!Directory.Exists(targetSeasonDir))
         {
             Directory.CreateDirectory(targetSeasonDir);
-            _logger.LogInformation("Created specials season directory: {Path}", targetSeasonDir);
+            _logger.LogInformation("Created season directory: {Path}", targetSeasonDir);
         }
 
         progress?.Report(5);
@@ -89,6 +109,12 @@ public class RezeroSyncService : IRezeroSyncService
         var syncedEpisodesCount = 0;
         var globalEpisodeIndex = 1;
 
+        var qualitiesToGenerate = config.EnableMultiVersionFiles
+            ? new[] { "1080p", "720p", "480p" }
+            : new[] { config.PreferredQuality };
+
+        var showTitle = isStandalone ? (config.StandaloneSeriesTitle ?? "Re:Zero - The Perfect Run") : "Re: ZERO, Starting Life in Another World";
+
         // 2. Process Arcs and Episodes
         for (var i = 0; i < totalArcs; i++)
         {
@@ -112,34 +138,38 @@ public class RezeroSyncService : IRezeroSyncService
                 {
                     foreach (var cap in captionsList)
                     {
-                        var streamUrl = _apiClient.ResolveStreamUrl(
-                            episode,
-                            arc,
-                            lang,
-                            cap,
-                            config.PreferredQuality,
-                            config.StreamFormat);
-
-                        if (string.IsNullOrWhiteSpace(streamUrl))
+                        foreach (var quality in qualitiesToGenerate)
                         {
-                            continue;
+                            var streamUrl = _apiClient.ResolveStreamUrl(
+                                episode,
+                                arc,
+                                lang,
+                                cap,
+                                quality,
+                                config.StreamFormat);
+
+                            if (string.IsNullOrWhiteSpace(streamUrl))
+                            {
+                                continue;
+                            }
+
+                            var qualitySuffix = config.EnableMultiVersionFiles ? $" - {quality}" : string.Empty;
+                            var variantSuffix = BuildVariantSuffix(languages.Count > 1, captionsList.Count > 1, lang, cap);
+                            var epTitle = string.IsNullOrWhiteSpace(episode.Title) ? $"Episode {episode.Number}" : episode.Title;
+                            var fileNameBase = $"Re ZERO Starting Life in Another World - S{config.SeasonNumber:D2}E{globalEpisodeIndex:D2} - [Arc {arc.Number:D2}] {SanitizeFileName(epTitle)}{variantSuffix}{qualitySuffix}";
+
+                            var strmFile = Path.Combine(targetSeasonDir, $"{fileNameBase}.strm");
+                            var nfoFile = Path.Combine(targetSeasonDir, $"{fileNameBase}.nfo");
+
+                            // Write .strm pointer
+                            await WriteIfChangedAsync(strmFile, streamUrl.Trim(), cancellationToken).ConfigureAwait(false);
+
+                            // Write .nfo metadata
+                            var nfoContent = BuildEpisodeNfo(arc, episode, globalEpisodeIndex, config.SeasonNumber, showTitle, epTitle, variantSuffix);
+                            await WriteIfChangedAsync(nfoFile, nfoContent, cancellationToken).ConfigureAwait(false);
+
+                            syncedEpisodesCount++;
                         }
-
-                        var variantSuffix = BuildVariantSuffix(languages.Count > 1, captionsList.Count > 1, lang, cap);
-                        var epTitle = string.IsNullOrWhiteSpace(episode.Title) ? $"Episode {episode.Number}" : episode.Title;
-                        var fileNameBase = $"Re ZERO Starting Life in Another World - S{config.SeasonNumber:D2}E{globalEpisodeIndex:D2} - [Arc {arc.Number:D2}] {SanitizeFileName(epTitle)}{variantSuffix}";
-
-                        var strmFile = Path.Combine(targetSeasonDir, $"{fileNameBase}.strm");
-                        var nfoFile = Path.Combine(targetSeasonDir, $"{fileNameBase}.nfo");
-
-                        // Write .strm pointer
-                        await WriteIfChangedAsync(strmFile, streamUrl.Trim(), cancellationToken).ConfigureAwait(false);
-
-                        // Write .nfo metadata
-                        var nfoContent = BuildEpisodeNfo(arc, episode, globalEpisodeIndex, config.SeasonNumber, epTitle, variantSuffix);
-                        await WriteIfChangedAsync(nfoFile, nfoContent, cancellationToken).ConfigureAwait(false);
-
-                        syncedEpisodesCount++;
                     }
                 }
 
@@ -171,9 +201,23 @@ public class RezeroSyncService : IRezeroSyncService
     public string? ResolveSeriesPath()
     {
         var config = Plugin.Instance?.Configuration;
-        if (!string.IsNullOrWhiteSpace(config?.TargetSeriesPath) && Directory.Exists(config.TargetSeriesPath))
+        if (config != null)
         {
-            return config.TargetSeriesPath;
+            // Custom path specified
+            if (!string.IsNullOrWhiteSpace(config.TargetSeriesPath) && Directory.Exists(config.TargetSeriesPath))
+            {
+                return config.TargetSeriesPath;
+            }
+
+            // Standalone series mode
+            if (string.Equals(config.IntegrationMode, "StandaloneSeries", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!string.IsNullOrWhiteSpace(config.StandaloneLibraryPath) && Directory.Exists(config.StandaloneLibraryPath))
+                {
+                    var seriesFolder = SanitizeFileName(config.StandaloneSeriesTitle ?? "Re:Zero - The Perfect Run");
+                    return Path.Combine(config.StandaloneLibraryPath, seriesFolder);
+                }
+            }
         }
 
         // Try to find series in Jellyfin library virtual folders
@@ -192,6 +236,14 @@ public class RezeroSyncService : IRezeroSyncService
                                 continue;
                             }
 
+                            // If standalone mode and library path not set, use first TV library root
+                            if (config != null && string.Equals(config.IntegrationMode, "StandaloneSeries", StringComparison.OrdinalIgnoreCase))
+                            {
+                                var seriesFolder = SanitizeFileName(config.StandaloneSeriesTitle ?? "Re:Zero - The Perfect Run");
+                                return Path.Combine(loc, seriesFolder);
+                            }
+
+                            // Match existing series folder
                             var matchedDir = Directory.EnumerateDirectories(loc)
                                 .FirstOrDefault(d =>
                                 {
@@ -291,6 +343,7 @@ public class RezeroSyncService : IRezeroSyncService
         EpisodeDto episode,
         int globalEpisodeIndex,
         int seasonNumber,
+        string showTitle,
         string epTitle,
         string variantSuffix)
     {
@@ -298,7 +351,7 @@ public class RezeroSyncService : IRezeroSyncService
             new XDeclaration("1.0", "utf-8", "yes"),
             new XElement("episodedetails",
                 new XElement("title", $"[The Perfect Run] Arc {arc.Number:D2}: {arc.Title} - Episode {episode.Number}{variantSuffix}"),
-                new XElement("showtitle", "Re: ZERO, Starting Life in Another World"),
+                new XElement("showtitle", showTitle),
                 new XElement("season", seasonNumber),
                 new XElement("episode", globalEpisodeIndex),
                 new XElement("plot", arc.Description),
@@ -309,6 +362,25 @@ public class RezeroSyncService : IRezeroSyncService
                 episode.Segments?.Outro != null ? new XElement("outro",
                     new XElement("start", episode.Segments.Outro.Start),
                     new XElement("end", episode.Segments.Outro.End)) : null
+            )
+        );
+
+        return doc.ToString();
+    }
+
+    private static string BuildTvShowNfo(string title)
+    {
+        var doc = new XDocument(
+            new XDeclaration("1.0", "utf-8", "yes"),
+            new XElement("tvshow",
+                new XElement("title", title),
+                new XElement("originaltitle", "Re:ゼロから始める異世界生活 - The Perfect Run"),
+                new XElement("plot", "Experience the world of Re:Zero through the lens of those around Subaru without deaths or loops. To those who never see his failures, just how much of an enigma must he seem?"),
+                new XElement("genre", "Animation"),
+                new XElement("genre", "Anime"),
+                new XElement("genre", "Fantasy"),
+                new XElement("studio", "White Fox"),
+                new XElement("year", "2026")
             )
         );
 
