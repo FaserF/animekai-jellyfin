@@ -89,6 +89,30 @@ public class ApiTests
     }
 
     [Fact]
+    public void ResolveStreamUrl_BothLanguageAndCaptions_ShouldResolveJpCcMasterPlaylist()
+    {
+        var client = new RezeroApiClient(new System.Net.Http.HttpClient(), NullLogger<RezeroApiClient>.Instance);
+        var arc = new ArcDto { Id = "arc01", Number = 1 };
+        var ep = new EpisodeDto
+        {
+            Number = 1,
+            Sources = new Dictionary<string, Dictionary<string, Dictionary<string, string>>>
+            {
+                ["jp"] = new()
+                {
+                    ["cc"] = new()
+                    {
+                        ["1080p"] = "ARC%2001/EP%201/1080p/ARC%2001%20-%20EP%201%20-%20JP%20BURNED%20CC/index.m3u8"
+                    }
+                }
+            }
+        };
+
+        var url = client.ResolveStreamUrl(ep, arc, "both", "both", "1080p", "hls_auto");
+        url.Should().Be("https://media.rezeroperfect.run/HLS/ARC%2001/EP%201/auto/ARC%2001%20-%20EP%201%20-%20JP%20BURNED%20CC/index.m3u8");
+    }
+
+    [Fact]
     public void ResolveStreamUrl_HlsAuto_ShouldResolveMasterPlaylist()
     {
         var client = new RezeroApiClient(new System.Net.Http.HttpClient(), NullLogger<RezeroApiClient>.Instance);

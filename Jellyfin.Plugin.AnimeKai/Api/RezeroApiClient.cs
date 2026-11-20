@@ -184,9 +184,52 @@ public class RezeroApiClient : IRezeroApiClient
         string captions,
         string preferredQuality)
     {
-        if (episode.Sources == null ||
-            !episode.Sources.TryGetValue(language, out var captionDict) ||
-            !captionDict.TryGetValue(captions, out var resolutionDict))
+        if (episode.Sources == null || episode.Sources.Count == 0)
+        {
+            return null;
+        }
+
+        Dictionary<string, Dictionary<string, string>>? captionDict = null;
+        var lang = string.IsNullOrWhiteSpace(language) ? "both" : language.Trim().ToLowerInvariant();
+        if (lang == "both")
+        {
+            if (!episode.Sources.TryGetValue("jp", out captionDict))
+            {
+                episode.Sources.TryGetValue("en", out captionDict);
+            }
+        }
+        else if (!episode.Sources.TryGetValue(lang, out captionDict))
+        {
+            foreach (var kvp in episode.Sources)
+            {
+                captionDict = kvp.Value;
+                break;
+            }
+        }
+
+        if (captionDict == null || captionDict.Count == 0)
+        {
+            return null;
+        }
+
+        Dictionary<string, string>? resolutionDict = null;
+        var cap = string.IsNullOrWhiteSpace(captions) ? "both" : captions.Trim().ToLowerInvariant();
+        if (cap == "clean" || cap == "off")
+        {
+            if (!captionDict.TryGetValue("off", out resolutionDict))
+            {
+                captionDict.TryGetValue("cc", out resolutionDict);
+            }
+        }
+        else
+        {
+            if (!captionDict.TryGetValue("cc", out resolutionDict))
+            {
+                captionDict.TryGetValue("off", out resolutionDict);
+            }
+        }
+
+        if (resolutionDict == null || resolutionDict.Count == 0)
         {
             return null;
         }
