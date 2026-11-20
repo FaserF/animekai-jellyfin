@@ -1,18 +1,18 @@
 {
   "category": "Live TV & Streaming",
-  "changelog": "Changes since `v0.1.0-beta`:\n\n### 🐛 Bug Fixes\n\n- **playback:** default to fast HLS Auto master streams, add multi-language and caption version switching, and fix controller authorization policy ([afeb92a](https://github.com/FaserF/rezero-jellyfin/commit/afeb92a))",
-  "description": "Seamlessly integrates Re:Zero - The Perfect Run into Jellyfin as an official-grade Special Season or Standalone Series via zero-overhead .strm streaming or sequential 1080p MP4 downloads.",
+  "changelog": "Release 0.2.0.0: Universal Anime Kai & Fan-Edits Plugin with Re:Zero Perfect Run, One Pace, Naruto Kai, Bleach Kai, and Consumet HLS Gateway.",
+  "description": "Universal streaming & metadata synchronization plugin for Anime Fan-Edits and Encrypted Streams: Re:Zero Perfect Run, One Pace, Naruto Kai, Bleach Kai, and Consumet HLS Gateway.",
   "guid": "aaf63d7c-95e2-4cda-a6fc-7fbea2b90f8a",
-  "name": "Re:Zero Perfect Run",
-  "overview": "Dynamic streaming & native MP4 download bridge with automated episode updater for Re:Zero Perfect Run.",
+  "name": "Anime Kai & Fan-Edits",
+  "overview": "Universal anime fan-edits and HLS streaming synchronization bridge with zero local video storage overhead.",
   "owner": "FaserF",
   "targetAbi": "12.0.0.0",
-  "timestamp": "2026-11-20T20:51:49Z",
-  "version": "0.1.1.0",
+  "timestamp": "2026-11-20T22:00:00Z",
+  "version": "0.2.0.0",
   "status": "Active",
   "autoUpdate": false,
   "imagePath": "thumb.png",
   "assemblies": [
-    "Jellyfin.Plugin.Rezero.dll"
+    "Jellyfin.Plugin.AnimeKai.dll"
   ]
 }

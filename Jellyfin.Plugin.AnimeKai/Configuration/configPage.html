@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Anime Kai &amp; Fan-Edits</title>
+</head>
+<body>
+    <div id="AnimeKaiConfigurationPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select,emby-checkbox">
+        <div data-role="content">
+            <div class="content-primary">
+                <form id="animeKaiConfigForm">
+                    <div class="sectionTitleContainer flex align-items-center">
+                        <h2 class="sectionTitle">Anime Kai &amp; Fan-Edits Configuration</h2>
+                    </div>
+                    <p class="fieldDescription">
+                        Universal anime fan-edits and direct HLS stream orchestrator for Jellyfin. Supports <strong>Re:Zero - The Perfect Run</strong>, <strong>One Pace</strong>, <strong>Naruto Kai</strong>, <strong>Bleach Kai</strong>, and self-hosted <strong>Consumet HLS Gateway</strong> with adaptive player switching, chapter metadata, and automated library synchronization.
+                    </p>
+
+                    <div style="background-color: rgba(0, 164, 220, 0.15); border: 1px solid #00a4dc; border-radius: 6px; padding: 12px 16px; margin-bottom: 20px; font-size: 0.92em; line-height: 1.45;">
+                        <strong>100% Direct TLS/HTTPS Client Streaming &amp; Downloads:</strong>
+                        All streams (.strm) and downloads strictly use direct private HTTPS connections (Cloudflare CDN, Pixeldrain Direct API, Consumet HLS). <strong>Zero BitTorrent or P2P networks are ever used</strong> &mdash; zero public swarm IP exposure and zero upload/seeding legal concerns.
+                    </div>
+
+                    <!-- Global Storage & Performance Section -->
+                    <div class="verticalSection">
+                        <h2>Global Storage &amp; Playback Settings</h2>
+
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input is="emby-checkbox" type="checkbox" id="chkOfferAllQualitiesInPlayer" name="OfferAllQualitiesInPlayer" />
+                                <span>Offer In-Player Dynamic Stream &amp; Audio Selection</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">
+                                Dynamically injects all alternate streams (HLS Adaptive, Dubbed audio, Clean Subs) into Jellyfin video player menus.
+                            </div>
+                        </div>
+
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input is="emby-checkbox" type="checkbox" id="chkEnableAutoSync" name="EnableAutoSync" />
+                                <span>Enable Scheduled Background Auto-Sync</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">
+                                Periodically scans upstream providers for new fan-edit releases, updates, and stream links.
+                            </div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="txtSyncIntervalHours">Auto-Sync Interval (Hours)</label>
+                            <input is="emby-input" type="number" id="txtSyncIntervalHours" name="SyncIntervalHours" class="emby-input" min="1" max="168" value="12" />
+                            <div class="fieldDescription">How often the background task checks for new episodes.</div>
+                        </div>
+
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input is="emby-checkbox" type="checkbox" id="chkEnableSymlink" name="EnableSymlink" />
+                                <span>Enable Dedicated Fast Storage / Symlink Offloading</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">
+                                Automatically detects fast NVMe/SSD mount points (or custom path) and creates symlinks into your Jellyfin TV folders to protect network or root storage.
+                            </div>
+                        </div>
+
+                        <div class="inputContainer" id="containerDedicatedStorage">
+                            <label class="inputLabel inputLabelUnfocused" for="txtDedicatedStoragePath">Dedicated Storage Path (Optional)</label>
+                            <input is="emby-input" type="text" id="txtDedicatedStoragePath" name="DedicatedStoragePath" class="emby-input" placeholder="/data/animekai" />
+                            <div class="fieldDescription">Custom directory for physical .strm / episode storage. Leave blank for auto-detection.</div>
+                        </div>
+                    </div>
+
+                    <!-- Provider 1: Re:Zero - The Perfect Run -->
+                    <div class="verticalSection" style="margin-top: 24px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 16px;">
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input is="emby-checkbox" type="checkbox" id="chkEnableRezero" name="EnableRezero" />
+                                <span style="font-size: 1.2em; font-weight: bold;">Enable Re:Zero - The Perfect Run</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">
+                                Integrates the chronological narrative fan re-cut of Re:Zero with fast HLS master streaming.
+                            </div>
+                        </div>
+
+                        <div id="sectionRezeroSettings" style="display: none; padding-left: 16px; border-left: 2px solid #52B54B; margin-top: 12px;">
+                            <div class="selectContainer">
+                                <label class="selectLabel" for="selectIntegrationMode">Re:Zero Integration Mode</label>
+                                <select is="emby-select" id="selectIntegrationMode" name="IntegrationMode" class="emby-select">
+                                    <option value="SpecialSeason">Special Season (Attach as Season 00/Specials to existing Re:Zero show)</option>
+                                    <option value="StandaloneSeries">Standalone Show (Create "Re:Zero - The Perfect Run" independently)</option>
+                                </select>
+                            </div>
+
+                            <div class="inputContainer" id="containerTargetSeriesPath">
+                                <label class="inputLabel inputLabelUnfocused" for="txtTargetSeriesPath">Custom Series Directory (Optional)</label>
+                                <input is="emby-input" type="text" id="txtTargetSeriesPath" name="TargetSeriesPath" class="emby-input" />
+                                <div class="fieldDescription">Leave blank to auto-detect existing Re:Zero folder in TV libraries.</div>
+                            </div>
+
+                            <div class="inputContainer" id="containerStandaloneLibraryPath" style="display: none;">
+                                <label class="inputLabel inputLabelUnfocused" for="txtStandaloneLibraryPath">Target TV Library Folder</label>
+                                <input is="emby-input" type="text" id="txtStandaloneLibraryPath" name="StandaloneLibraryPath" class="emby-input" />
+                                <div class="fieldDescription">Path to the library root folder where the standalone show folder will be created.</div>
+                            </div>
+
+                            <div class="selectContainer">
+                                <label class="selectLabel" for="selectSyncMode">Synchronization Mode</label>
+                                <select is="emby-select" id="selectSyncMode" name="SyncMode" class="emby-select">
+                                    <option value="Stream">Stream (.strm pointers &mdash; instant, zero video disk usage)</option>
+                                    <option value="Download">Download (Full 1080p MP4 files downloaded sequentially via HTTPS)</option>
+                                </select>
+                            </div>
+
+                            <div class="selectContainer">
+                                <label class="selectLabel" for="selectStreamFormat">Primary Stream URL Format</label>
+                                <select is="emby-select" id="selectStreamFormat" name="StreamFormat" class="emby-select">
+                                    <option value="hls_auto">Fast Adaptive HLS Stream (index.m3u8 &mdash; Best performance)</option>
+                                    <option value="direct_mp4">Direct 1080p MP4 URL (Single file stream)</option>
+                                </select>
+                            </div>
+
+                            <div class="selectContainer">
+                                <label class="selectLabel" for="selectPreferredLanguage">Preferred Language</label>
+                                <select is="emby-select" id="selectPreferredLanguage" name="PreferredLanguage" class="emby-select">
+                                    <option value="jp">Japanese Audio (Original)</option>
+                                    <option value="en">English Dub</option>
+                                </select>
+                            </div>
+
+                            <div class="selectContainer">
+                                <label class="selectLabel" for="selectPreferredCaptions">Preferred Captions</label>
+                                <select is="emby-select" id="selectPreferredCaptions" name="PreferredCaptions" class="emby-select">
+                                    <option value="cc">English Subtitles (Burned-in CC)</option>
+                                    <option value="clean">Clean (No hardcoded subtitles)</option>
+                                </select>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="txtApiBaseUrl">Re:Zero API Base URL</label>
+                                <input is="emby-input" type="text" id="txtApiBaseUrl" name="ApiBaseUrl" class="emby-input" value="https://rezeroperfect.run/" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Provider 2: One Pace -->
+                    <div class="verticalSection" style="margin-top: 24px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 16px;">
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input is="emby-checkbox" type="checkbox" id="chkEnableOnePace" name="EnableOnePace" />
+                                <span style="font-size: 1.2em; font-weight: bold;">Enable One Pace (Anime Fan-Edit)</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">
+                                Integrates the definitive manga-accurate cut of One Piece, condensed into 34 arc seasons with direct HTTPS Pixeldrain streaming.
+                            </div>
+                        </div>
+
+                        <div id="sectionOnePaceSettings" style="display: none; padding-left: 16px; border-left: 2px solid #E5A00D; margin-top: 12px;">
+                            <div class="selectContainer">
+                                <label class="selectLabel" for="selectOnePaceMode">One Pace Structure</label>
+                                <select is="emby-select" id="selectOnePaceMode" name="OnePaceIntegrationMode" class="emby-select">
+                                    <option value="IndependentShow">Independent Show ("One Pace" with Seasons 1..34 matching Arcs)</option>
+                                    <option value="Specials">Specials (Attach to existing One Piece as Season 00)</option>
+                                </select>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="txtOnePaceTargetDirectory">Target Library Directory (Optional)</label>
+                                <input is="emby-input" type="text" id="txtOnePaceTargetDirectory" name="OnePaceTargetDirectory" class="emby-input" placeholder="/data/tv/One Pace" />
+                                <div class="fieldDescription">Destination folder for One Pace. Leave blank for auto-detection in anime/tv libraries.</div>
+                            </div>
+
+                            <div class="selectContainer">
+                                <label class="selectLabel" for="selectOnePaceQuality">Preferred Stream Quality</label>
+                                <select is="emby-select" id="selectOnePaceQuality" name="OnePacePreferredQuality" class="emby-select">
+                                    <option value="1080p">1080p High Definition (Default)</option>
+                                    <option value="720p">720p Standard HD</option>
+                                </select>
+                            </div>
+
+                            <div class="selectContainer">
+                                <label class="selectLabel" for="selectOnePaceLanguage">Preferred Audio Track</label>
+                                <select is="emby-select" id="selectOnePaceLanguage" name="OnePacePreferredLanguage" class="emby-select">
+                                    <option value="jp">Japanese Audio with English Subtitles</option>
+                                    <option value="en">English Dub (where available)</option>
+                                </select>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="txtOnePacePixeldrainApiKey">Pixeldrain API Key (Optional)</label>
+                                <input is="emby-input" type="password" id="txtOnePacePixeldrainApiKey" name="OnePacePixeldrainApiKey" class="emby-input" />
+                                <div class="fieldDescription">Optional Pixeldrain Pro API key for increased direct HTTPS streaming rate limits.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Provider 3: Naruto Kai -->
+                    <div class="verticalSection" style="margin-top: 24px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 16px;">
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input is="emby-checkbox" type="checkbox" id="chkEnableNarutoKai" name="EnableNarutoKai" />
+                                <span style="font-size: 1.2em; font-weight: bold;">Enable Naruto Kai (Manga Volume Fan-Edit)</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">
+                                Integrates the 72 feature-length volume episodes of Naruto Kai (Chapters 1–700), cutting all non-canon filler.
+                            </div>
+                        </div>
+
+                        <div id="sectionNarutoKaiSettings" style="display: none; padding-left: 16px; border-left: 2px solid #FF8C00; margin-top: 12px;">
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="txtNarutoKaiTargetDirectory">Target Series Directory (Optional)</label>
+                                <input is="emby-input" type="text" id="txtNarutoKaiTargetDirectory" name="NarutoKaiTargetDirectory" class="emby-input" placeholder="/data/tv/Naruto Kai" />
+                                <div class="fieldDescription">Folder where Naruto Kai .strm and metadata will be placed.</div>
+                            </div>
+
+                            <div class="selectContainer">
+                                <label class="selectLabel" for="selectNarutoKaiLanguage">Preferred Audio</label>
+                                <select is="emby-select" id="selectNarutoKaiLanguage" name="NarutoKaiLanguage" class="emby-select">
+                                    <option value="jp">Japanese with English Subtitles</option>
+                                    <option value="en">English Dub</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Provider 4: Bleach Kai -->
+                    <div class="verticalSection" style="margin-top: 24px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 16px;">
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input is="emby-checkbox" type="checkbox" id="chkEnableBleachKai" name="EnableBleachKai" />
+                                <span style="font-size: 1.2em; font-weight: bold;">Enable Bleach Kai (Manga Volume Fan-Edit)</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">
+                                Integrates the 36 feature-length volume episodes of Bleach Kai (Chapters 1–686), omitting all filler arcs.
+                            </div>
+                        </div>
+
+                        <div id="sectionBleachKaiSettings" style="display: none; padding-left: 16px; border-left: 2px solid #00BFFF; margin-top: 12px;">
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="txtBleachKaiTargetDirectory">Target Series Directory (Optional)</label>
+                                <input is="emby-input" type="text" id="txtBleachKaiTargetDirectory" name="BleachKaiTargetDirectory" class="emby-input" placeholder="/data/tv/Bleach Kai" />
+                                <div class="fieldDescription">Folder where Bleach Kai .strm and metadata will be placed.</div>
+                            </div>
+
+                            <div class="selectContainer">
+                                <label class="selectLabel" for="selectBleachKaiLanguage">Preferred Audio</label>
+                                <select is="emby-select" id="selectBleachKaiLanguage" name="BleachKaiLanguage" class="emby-select">
+                                    <option value="jp">Japanese with English Subtitles</option>
+                                    <option value="en">English Dub</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Provider 5: Consumet / AniCli HLS Scrapers -->
+                    <div class="verticalSection" style="margin-top: 24px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 16px;">
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input is="emby-checkbox" type="checkbox" id="chkEnableConsumet" name="EnableConsumet" />
+                                <span style="font-size: 1.2em; font-weight: bold;">Enable Consumet API / AniCli HLS Gateway</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">
+                                Dynamically scrapes HLS .m3u8 streams and subtitles for custom anime titles via a self-hosted Consumet API container.
+                            </div>
+                        </div>
+
+                        <div id="sectionConsumetSettings" style="display: none; padding-left: 16px; border-left: 2px solid #9932CC; margin-top: 12px;">
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="txtConsumetApiUrl">Consumet API Endpoint URL</label>
+                                <input is="emby-input" type="text" id="txtConsumetApiUrl" name="ConsumetApiUrl" class="emby-input" placeholder="http://127.0.0.1:3000" />
+                                <div class="fieldDescription">Base URL to your self-hosted Consumet Docker container or public instance.</div>
+                            </div>
+
+                            <div class="selectContainer">
+                                <label class="selectLabel" for="selectConsumetProvider">Scraper Provider</label>
+                                <select is="emby-select" id="selectConsumetProvider" name="ConsumetProvider" class="emby-select">
+                                    <option value="gogoanime">Gogoanime (Fast HLS)</option>
+                                    <option value="zoro">Zoro / Aniwatch (Multi-sub &amp; Dub)</option>
+                                    <option value="animepahe">AnimePahe (Multi-quality)</option>
+                                </select>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="txtConsumetAnimeSlugs">Subscribed Anime Slugs</label>
+                                <input is="emby-input" type="text" id="txtConsumetAnimeSlugs" name="ConsumetAnimeSlugs" class="emby-input" placeholder="steinsgate, chainsaw-man" />
+                                <div class="fieldDescription">Comma-separated anime identifiers to scrape and synchronize as .strm libraries.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sync Status & Manual Action -->
+                    <div class="verticalSection" style="margin-top: 28px; padding: 18px; background-color: rgba(0, 0, 0, 0.2); border-radius: 8px;">
+                        <h2>Sync Status &amp; Manual Run</h2>
+                        <div id="lblSyncStatus" style="line-height: 1.6; margin-bottom: 14px;">
+                            <em>Loading multi-provider status...</em>
+                        </div>
+                        <button is="emby-button" type="button" class="raised button-accent" id="btnManualSync">
+                            <span>Sync All Enabled Anime Providers Now</span>
+                        </button>
+                    </div>
+
+                    <div class="verticalSection" style="margin-top: 24px;">
+                        <button is="emby-button" type="submit" class="raised button-submit block">
+                            <span>Save All Settings</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <script type="text/javascript">
+            var pluginId = "aaf63d7c-95e2-4cda-a6fc-7fbea2b90f8a";
+
+            function toggleSection(chkId, sectionId) {
+                var chk = document.querySelector("#" + chkId);
+                var sec = document.querySelector("#" + sectionId);
+                if (chk && sec) {
+                    sec.style.display = chk.checked ? "block" : "none";
+                }
+            }
+
+            function updateRezeroModeVisibility(mode) {
+                var customDiv = document.querySelector("#containerTargetSeriesPath");
+                var standDiv = document.querySelector("#containerStandaloneLibraryPath");
+                if (customDiv && standDiv) {
+                    customDiv.style.display = mode === "SpecialSeason" ? "block" : "none";
+                    standDiv.style.display = mode === "StandaloneSeries" ? "block" : "none";
+                }
+            }
+
+            function loadConfig(page) {
+                Dashboard.showLoadingMsg();
+                ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                    // Global
+                    page.querySelector("#chkOfferAllQualitiesInPlayer").checked = config.OfferAllQualitiesInPlayer !== false;
+                    page.querySelector("#chkEnableAutoSync").checked = config.EnableAutoSync !== false;
+                    page.querySelector("#txtSyncIntervalHours").value = config.SyncIntervalHours || 12;
+                    page.querySelector("#chkEnableSymlink").checked = config.EnableSymlink !== false;
+                    page.querySelector("#txtDedicatedStoragePath").value = config.DedicatedStoragePath || "";
+
+                    // Re:Zero
+                    page.querySelector("#chkEnableRezero").checked = config.EnableRezero === true;
+                    page.querySelector("#selectIntegrationMode").value = config.IntegrationMode || "SpecialSeason";
+                    page.querySelector("#txtTargetSeriesPath").value = config.TargetSeriesPath || "";
+                    page.querySelector("#txtStandaloneLibraryPath").value = config.StandaloneLibraryPath || "";
+                    page.querySelector("#selectSyncMode").value = config.SyncMode || "Stream";
+                    page.querySelector("#selectStreamFormat").value = config.StreamFormat || "hls_auto";
+                    page.querySelector("#selectPreferredLanguage").value = config.PreferredLanguage || "jp";
+                    page.querySelector("#selectPreferredCaptions").value = config.PreferredCaptions || "cc";
+                    page.querySelector("#txtApiBaseUrl").value = config.ApiBaseUrl || "https://rezeroperfect.run/";
+
+                    // One Pace
+                    page.querySelector("#chkEnableOnePace").checked = config.EnableOnePace === true;
+                    page.querySelector("#selectOnePaceMode").value = config.OnePaceIntegrationMode || "IndependentShow";
+                    page.querySelector("#txtOnePaceTargetDirectory").value = config.OnePaceTargetDirectory || "";
+                    page.querySelector("#selectOnePaceQuality").value = config.OnePacePreferredQuality || "1080p";
+                    page.querySelector("#selectOnePaceLanguage").value = config.OnePacePreferredLanguage || "jp";
+                    page.querySelector("#txtOnePacePixeldrainApiKey").value = config.OnePacePixeldrainApiKey || "";
+
+                    // Naruto Kai
+                    page.querySelector("#chkEnableNarutoKai").checked = config.EnableNarutoKai === true;
+                    page.querySelector("#txtNarutoKaiTargetDirectory").value = config.NarutoKaiTargetDirectory || "";
+                    page.querySelector("#selectNarutoKaiLanguage").value = config.NarutoKaiLanguage || "jp";
+
+                    // Bleach Kai
+                    page.querySelector("#chkEnableBleachKai").checked = config.EnableBleachKai === true;
+                    page.querySelector("#txtBleachKaiTargetDirectory").value = config.BleachKaiTargetDirectory || "";
+                    page.querySelector("#selectBleachKaiLanguage").value = config.BleachKaiLanguage || "jp";
+
+                    // Consumet
+                    page.querySelector("#chkEnableConsumet").checked = config.EnableConsumet === true;
+                    page.querySelector("#txtConsumetApiUrl").value = config.ConsumetApiUrl || "";
+                    page.querySelector("#selectConsumetProvider").value = config.ConsumetProvider || "gogoanime";
+                    page.querySelector("#txtConsumetAnimeSlugs").value = config.ConsumetAnimeSlugs || "";
+
+                    toggleSection("chkEnableRezero", "sectionRezeroSettings");
+                    toggleSection("chkEnableOnePace", "sectionOnePaceSettings");
+                    toggleSection("chkEnableNarutoKai", "sectionNarutoKaiSettings");
+                    toggleSection("chkEnableBleachKai", "sectionBleachKaiSettings");
+                    toggleSection("chkEnableConsumet", "sectionConsumetSettings");
+                    updateRezeroModeVisibility(config.IntegrationMode || "SpecialSeason");
+
+                    Dashboard.hideLoadingMsg();
+                });
+
+                // Status query
+                ApiClient.getJSON(ApiClient.getUrl("AnimeKai/Status")).then(function (status) {
+                    var statusEl = page.querySelector("#lblSyncStatus");
+                    var lastSyncUtc = status.lastSyncUtc || status.LastSyncUtc;
+                    var lastSync = lastSyncUtc ? new Date(lastSyncUtc).toLocaleString() : "Never";
+                    var syncStatus = status.lastSyncStatus || status.LastSyncStatus || "Idle";
+                    var totalEpisodes = status.totalSyncedEpisodes !== undefined ? status.totalSyncedEpisodes : (status.TotalSyncedEpisodes || 0);
+                    var activeProviders = (status.activeProviders || status.ActiveProviders || []).join(", ") || "None enabled";
+                    var resolvedStorage = status.resolvedStoragePath || status.ResolvedStoragePath || "Auto-detecting...";
+
+                    statusEl.innerHTML = "<strong>Overall Status:</strong> " + syncStatus +
+                        "<br><strong>Active Providers:</strong> " + activeProviders +
+                        "<br><strong>Total Synced Episodes:</strong> " + totalEpisodes +
+                        "<br><strong>Physical Storage:</strong> " + resolvedStorage +
+                        "<br><strong>Last Sync:</strong> " + lastSync;
+                }).catch(function() {
+                    // Fallback to Rezero/Status
+                    ApiClient.getJSON(ApiClient.getUrl("Rezero/Status")).then(function (status) {
+                        var statusEl = page.querySelector("#lblSyncStatus");
+                        statusEl.innerHTML = "<strong>Status:</strong> " + (status.lastSyncStatus || "Ready") +
+                            "<br><strong>Total Synced:</strong> " + (status.totalSyncedEpisodes || 0) +
+                            "<br><strong>Physical Storage:</strong> " + (status.resolvedStoragePath || "Auto");
+                    }).catch(function() {});
+                });
+            }
+
+            document.querySelector("#AnimeKaiConfigurationPage").addEventListener("pageshow", function () {
+                var page = this;
+                loadConfig(page);
+
+                if (page._animeKaiBound) {
+                    return;
+                }
+                page._animeKaiBound = true;
+
+                page.querySelector("#chkEnableRezero").addEventListener("change", function () {
+                    toggleSection("chkEnableRezero", "sectionRezeroSettings");
+                });
+                page.querySelector("#chkEnableOnePace").addEventListener("change", function () {
+                    toggleSection("chkEnableOnePace", "sectionOnePaceSettings");
+                });
+                page.querySelector("#chkEnableNarutoKai").addEventListener("change", function () {
+                    toggleSection("chkEnableNarutoKai", "sectionNarutoKaiSettings");
+                });
+                page.querySelector("#chkEnableBleachKai").addEventListener("change", function () {
+                    toggleSection("chkEnableBleachKai", "sectionBleachKaiSettings");
+                });
+                page.querySelector("#chkEnableConsumet").addEventListener("change", function () {
+                    toggleSection("chkEnableConsumet", "sectionConsumetSettings");
+                });
+
+                page.querySelector("#selectIntegrationMode").addEventListener("change", function () {
+                    updateRezeroModeVisibility(this.value);
+                });
+
+                page.querySelector("#animeKaiConfigForm").addEventListener("submit", function (e) {
+                    e.preventDefault();
+                    Dashboard.showLoadingMsg();
+                    ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                        // Global
+                        config.OfferAllQualitiesInPlayer = page.querySelector("#chkOfferAllQualitiesInPlayer").checked;
+                        config.EnableAutoSync = page.querySelector("#chkEnableAutoSync").checked;
+                        config.SyncIntervalHours = parseInt(page.querySelector("#txtSyncIntervalHours").value, 10) || 12;
+                        config.EnableSymlink = page.querySelector("#chkEnableSymlink").checked;
+                        config.DedicatedStoragePath = page.querySelector("#txtDedicatedStoragePath").value;
+
+                        // Re:Zero
+                        config.EnableRezero = page.querySelector("#chkEnableRezero").checked;
+                        config.IntegrationMode = page.querySelector("#selectIntegrationMode").value;
+                        config.TargetSeriesPath = page.querySelector("#txtTargetSeriesPath").value;
+                        config.StandaloneLibraryPath = page.querySelector("#txtStandaloneLibraryPath").value;
+                        config.SyncMode = page.querySelector("#selectSyncMode").value;
+                        config.StreamFormat = page.querySelector("#selectStreamFormat").value;
+                        config.PreferredLanguage = page.querySelector("#selectPreferredLanguage").value;
+                        config.PreferredCaptions = page.querySelector("#selectPreferredCaptions").value;
+                        config.ApiBaseUrl = page.querySelector("#txtApiBaseUrl").value;
+
+                        // One Pace
+                        config.EnableOnePace = page.querySelector("#chkEnableOnePace").checked;
+                        config.OnePaceIntegrationMode = page.querySelector("#selectOnePaceMode").value;
+                        config.OnePaceTargetDirectory = page.querySelector("#txtOnePaceTargetDirectory").value;
+                        config.OnePacePreferredQuality = page.querySelector("#selectOnePaceQuality").value;
+                        config.OnePacePreferredLanguage = page.querySelector("#selectOnePaceLanguage").value;
+                        config.OnePacePixeldrainApiKey = page.querySelector("#txtOnePacePixeldrainApiKey").value;
+
+                        // Naruto Kai
+                        config.EnableNarutoKai = page.querySelector("#chkEnableNarutoKai").checked;
+                        config.NarutoKaiTargetDirectory = page.querySelector("#txtNarutoKaiTargetDirectory").value;
+                        config.NarutoKaiLanguage = page.querySelector("#selectNarutoKaiLanguage").value;
+
+                        // Bleach Kai
+                        config.EnableBleachKai = page.querySelector("#chkEnableBleachKai").checked;
+                        config.BleachKaiTargetDirectory = page.querySelector("#txtBleachKaiTargetDirectory").value;
+                        config.BleachKaiLanguage = page.querySelector("#selectBleachKaiLanguage").value;
+
+                        // Consumet
+                        config.EnableConsumet = page.querySelector("#chkEnableConsumet").checked;
+                        config.ConsumetApiUrl = page.querySelector("#txtConsumetApiUrl").value;
+                        config.ConsumetProvider = page.querySelector("#selectConsumetProvider").value;
+                        config.ConsumetAnimeSlugs = page.querySelector("#txtConsumetAnimeSlugs").value;
+
+                        ApiClient.updatePluginConfiguration(pluginId, config).then(function (result) {
+                            Dashboard.processPluginConfigurationUpdateResult(result);
+                        });
+                    });
+                    return false;
+                });
+
+                page.querySelector("#btnManualSync").addEventListener("click", function () {
+                    Dashboard.showLoadingMsg();
+                    ApiClient.ajax({
+                        type: "POST",
+                        url: ApiClient.getUrl("AnimeKai/Sync")
+                    }).then(function (res) {
+                        Dashboard.hideLoadingMsg();
+                        var data = typeof res === "string" ? JSON.parse(res) : res;
+                        var msg = (data && data.message) ? data.message : "Synchronization finished.";
+                        Dashboard.alert({ message: msg });
+                        loadConfig(page);
+                    }).catch(function (err) {
+                        Dashboard.hideLoadingMsg();
+                        var errMsg = (err && err.message) ? err.message : JSON.stringify(err);
+                        Dashboard.alert({ message: "Sync failed: " + errMsg });
+                    });
+                });
+            });
+        </script>
+    </div>
+</body>
+</html>

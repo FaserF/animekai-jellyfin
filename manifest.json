@@ -1,12 +1,12 @@
 [
   {
     "guid": "aaf63d7c-95e2-4cda-a6fc-7fbea2b90f8a",
-    "name": "Re:Zero Perfect Run",
-    "description": "Seamlessly integrates Re:Zero - The Perfect Run into Jellyfin as an official-grade Special Season or Standalone Series via zero-overhead .strm streaming or sequential 1080p MP4 downloads.",
-    "overview": "Dynamic streaming & native MP4 download bridge with automated episode updater for Re:Zero Perfect Run.",
+    "name": "Anime Kai & Fan-Edits",
+    "description": "Universal streaming & metadata synchronization plugin for Anime Fan-Edits and Encrypted Streams: Re:Zero Perfect Run, One Pace, Naruto Kai, Bleach Kai, and Consumet HLS Gateway.",
+    "overview": "Universal Anime Fan-Edits & Direct HLS Stream Integration with Zero-Torrent Privacy Protection.",
     "owner": "FaserF",
     "category": "Live TV & Streaming",
-    "imageUrl": "https://raw.githubusercontent.com/FaserF/rezero-jellyfin/main/Jellyfin.Plugin.Rezero/thumb.png",
+    "imageUrl": "https://raw.githubusercontent.com/FaserF/rezero-jellyfin/main/Jellyfin.Plugin.AnimeKai/thumb.png",
     "versions": [
       {
         "version": "0.1.1.0",

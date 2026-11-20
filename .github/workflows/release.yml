@@ -160,7 +160,7 @@ jobs:
 
       - name: Run Tests
         run: |
-          dotnet run --project Jellyfin.Plugin.Rezero.Tests -c Release --no-build
+          dotnet run --project Jellyfin.Plugin.AnimeKai.Tests -c Release --no-build
 
       - name: Update meta.json and Package Plugin Archive
         shell: bash
@@ -171,24 +171,25 @@ jobs:
             --changelog-file CHANGELOG_SUMMARY.txt
 
           mkdir -p dist
-          cp Jellyfin.Plugin.Rezero/bin/Release/net10.0/Jellyfin.Plugin.Rezero.dll dist/
-          cp Jellyfin.Plugin.Rezero/bin/Release/net10.0/Jellyfin.Plugin.Rezero.pdb dist/
-          cp Jellyfin.Plugin.Rezero/*.png dist/ 2>/dev/null || true
+          cp Jellyfin.Plugin.AnimeKai/bin/Release/net10.0/Jellyfin.Plugin.AnimeKai.dll dist/
+          cp Jellyfin.Plugin.AnimeKai/bin/Release/net10.0/Jellyfin.Plugin.AnimeKai.pdb dist/
+          cp Jellyfin.Plugin.AnimeKai/bin/Release/net10.0/AngleSharp.dll dist/ 2>/dev/null || true
+          cp Jellyfin.Plugin.AnimeKai/*.png dist/ 2>/dev/null || true
           cp meta.json dist/
 
           cd dist
-          zip -9 -r ../rezero.zip .
+          zip -9 -r ../animekai.zip .
           cd ..
 
-          md5sum rezero.zip > checksums.txt
-          sha256sum rezero.zip >> checksums.txt
+          md5sum animekai.zip > checksums.txt
+          sha256sum animekai.zip >> checksums.txt
           cat checksums.txt
 
       - name: Update manifest.json
         run: |
           python .github/scripts/update_manifest.py \
             --manifest-path manifest.json \
-            --zip-path rezero.zip \
+            --zip-path animekai.zip \
             --version "${{ needs.determine-version.outputs.assembly_version }}" \
             --tag "${{ needs.determine-version.outputs.tag }}" \
             --changelog-file CHANGELOG_SUMMARY.txt \
@@ -214,5 +215,5 @@ jobs:
           prerelease: ${{ needs.determine-version.outputs.is_prerelease == 'true' }}
           draft: false
           files: |
-            rezero.zip
+            animekai.zip
             checksums.txt

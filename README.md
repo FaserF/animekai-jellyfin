@@ -1,48 +1,39 @@
 <div align="center">
 
-# 🌀 Jellyfin Re:Zero Perfect Run Plugin (`Jellyfin.Plugin.Rezero`)
+# ⛩️ Jellyfin Anime Kai & Fan-Edits Plugin (`Jellyfin.Plugin.AnimeKai`)
 
-**Seamlessly integrate *Re:Zero − Starting Life in Another World: The Perfect Run* into Jellyfin as an official Special Season with zero local storage overhead.**
+**Universal streaming, metadata synchronization, and in-player audio/version switcher for Anime Fan-Edits & Direct HLS Streams in Jellyfin.**
 
 [![.NET 10.0](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
 [![Jellyfin 10.10+ | 12.x](https://img.shields.io/badge/Jellyfin-10.10%2B%20%7C%2012.x-00A4DC?logo=jellyfin&logoColor=white)](https://jellyfin.org/)
-[![Source: rezeroperfect.run](https://img.shields.io/badge/Source-rezeroperfect.run-8A2BE2)](https://rezeroperfect.run/)
+[![Privacy: Zero-Torrent](https://img.shields.io/badge/Privacy-Zero--Torrent%20%2F%20Direct%20HTTPS-brightgreen)](README.md#-100-direct-tlshttps--zero-torrent-policy)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![GitHub Release](https://img.shields.io/github/v/release/FaserF/rezero-jellyfin?include_prereleases&color=blue)](https://github.com/FaserF/rezero-jellyfin/releases)
 
-*Watch the acclaimed re-cut where Subaru succeeds on his first attempt without loops or deaths, integrated directly into your existing Re:Zero TV series with **zero-byte `.strm` direct playback**, **rich `.nfo` metadata**, **Intro Skipper segment markers**, and an **automated background update engine** that detects re-edits and newly released arcs.*
+*Watch the acclaimed manga-accurate and fan-edited cuts of your favorite anime directly in Jellyfin with **zero-byte `.strm` direct playback**, **rich `.nfo` metadata**, **Intro Skipper segment markers**, and an **automated background update engine**.*
 
 </div>
 
 ---
 
-## 📖 Table of Contents
+## 🔒 100% Direct TLS/HTTPS & Zero-Torrent Policy
 
-1. [Overview & Core Philosophy](#-overview--core-philosophy)
-2. [System Architecture](#-system-architecture)
-3. [Key Features Breakdown](#-key-features-breakdown)
-   - [1. Official Special Season Integration (Season 00 / Specials)](#1-official-special-season-integration-season-00--specials)
-   - [2. Zero Local Disk Overhead via `.strm` Direct Play](#2-zero-local-disk-overhead-via-strm-direct-play)
-   - [3. Audio & Subtitle Synchronization (Japanese, English & Burned CC)](#3-audio--subtitle-synchronization)
-   - [4. Automated Update Engine (Tracking `updates.json` & RSS)](#4-automated-update-engine)
-   - [5. Native Intro Skipper Integration](#5-native-intro-skipper-integration)
-4. [Configuration Reference (`PluginConfiguration`)](#-configuration-reference-pluginconfiguration)
-5. [REST API & Scheduled Tasks](#-rest-api--scheduled-tasks)
-6. [Local Build & Development](#-local-build--development)
-7. [License & Sponsors](#-license--sponsors)
+All streaming pointers (`.strm`) and downloads strictly use **direct, private 1:1 client HTTPS connections** to official content distribution points (Cloudflare-fronted CDNs, Pixeldrain Direct API, self-hosted Consumet HLS Gateways).
+- **Zero BitTorrent / P2P Swarms**: No torrent protocols, no DHT querying, and no background upload/seeding.
+- **Zero Public IP Leakage**: Eliminates copyright strike and legal exposure common in public peer-to-peer swarms.
+- **Instant Playback**: Video files stream directly into Jellyfin player clients without saturating server NVMe or local disk space.
 
 ---
 
-## 🌟 Overview & Core Philosophy
+## 🌟 Supported Providers
 
-[Re:Zero - The Perfect Run](https://rezeroperfect.run) is a fan-made project that re-edits the entire *Re:Zero − Starting Life in Another World* anime to remove all deaths and loops, showing the narrative through the perspective of those around Subaru as he navigates the story with uncanny foresight.
-
-Traditional integration requires downloading hundreds of gigabytes of video files. The **Jellyfin Re:Zero Plugin** eliminates storage bottlenecks:
-- **No Video Downloads**: Uses lightweight `.strm` streaming pointers pointing to direct high-speed CDNs.
-- **Official Look & Feel**: Automatically attaches to your existing `Re:Zero` series as **Season 00 (Specials)** (or creates a standalone series), complete with arc artwork, episode titles, and plot summaries.
-- **Fast Local Dedicated Folder + Symlink**: Automatically detects mergerfs/rclone cloud mounts and stores tiny `.strm`/`.nfo` files (~500 KB total) on fast local disk (e.g. `/data/rezero/Season 00`), exposing them cleanly into your library via symlink with zero cloud API latency.
-- **In-Player Quality Selection**: Offers 1080p Direct MP4, 720p HD, and 480p SD streams dynamically inside Jellyfin's Version/Quality dropdown.
-- **100% API Powered**: Fetches structured metadata via clean JSON endpoints (`videos.json`, `episodes/arcXX.json`, and `updates.json`) with zero fragile web scraping.
+| Provider | ID | Description | Primary Sources & Format |
+|---|---|---|---|
+| **Re:Zero - The Perfect Run** | `rezero` | Chronological narrative fan re-cut removing Subaru's deaths/loops. Seamless arcs 1–6. | Fast Adaptive HLS Master (`index.m3u8`) & Direct 1080p MP4 |
+| **One Pace** | `onepace` | Definitive manga-accurate cut of One Piece (Seasons 1..34 matching arcs). Eliminates 45%+ filler and pacing bloat. | Official Pixeldrain Direct HTTPS API (`1080p` / `720p`, Sub / Dub) |
+| **Naruto Kai** | `narutokai` | 72 feature-length volume episodes matching Masashi Kishimoto's manga Volumes 1–72 (Chapters 1–700). Zero filler. | Direct HTTPS Stream Pointers & NFO Chapters |
+| **Bleach Kai** | `bleachkai` | 36 feature-length volume episodes matching Tite Kubo's manga (Chapters 1–686). Omit all non-canon filler arcs (Bount, Amagai, Zanpakuto Rebellion, Regai). | Direct HTTPS Stream Pointers & NFO Chapters |
+| **Consumet HLS Gateway** | `consumet` | Dynamic on-demand HLS scraper gateway for custom anime titles via self-hosted Consumet container. | HLS `.m3u8` multi-quality streams & WebVTT subtitles |
 
 ---
 
@@ -50,127 +41,108 @@ Traditional integration requires downloading hundreds of gigabytes of video file
 
 ```mermaid
 flowchart TD
-    API["rezeroperfect.run API<br>(videos.json, arc01-06.json, updates.json)"] -->|HTTP / JSON| Client["RezeroApiClient"]
-    Client --> SyncService["RezeroSyncService"]
-    Task["RezeroSyncTask (Scheduled Task)"] -->|Periodic Check (Every 12h)| SyncService
-    UI["Jellyfin Web Dashboard"] -->|Manual Sync Trigger| SyncService
+    subgraph Upstream Providers
+        RZ["Re:Zero API<br>(rezeroperfect.run)"]
+        OP["One Pace Catalog<br>(onepace.net / Pixeldrain)"]
+        NK["Naruto Kai Catalog<br>(72 Manga Volumes)"]
+        BK["Bleach Kai Catalog<br>(36 Manga Volumes)"]
+        CS["Consumet Gateway<br>(Self-hosted Docker)"]
+    end
 
-    SyncService --> TargetSeries["Series & Mount Discovery<br>(StoragePathResolver)"]
-    TargetSeries --> Writer["Strm & NFO Generator"]
+    subgraph Anime Kai Engine
+        Sync["AnimeSyncService"]
+        Task["AnimeSyncTask (Every 12h)"] --> Sync
+        API["AnimeController (/AnimeKai, /Rezero)"] --> Sync
 
-    Writer --> StrmFiles[".strm Stream Files<br>(Universal 1080p Direct MP4 / HLS)"]
-    Writer --> NfoFiles[".nfo Metadata Files<br>(Arc Info, Episode Plots, Intro/Outro)"]
+        RZ --> Sync
+        OP --> Sync
+        NK --> Sync
+        BK --> Sync
+        CS --> Sync
 
-    StrmFiles --> LocalStore["Dedicated Fast Local Folder<br>(e.g. /data/rezero/Season 00)"]
-    NfoFiles --> LocalStore
-    LocalStore -.->|Symlink| SeriesSeason["Series Folder<br>(.../Season 00/)"]
+        Sync --> Linker["AnimeStorageLinker"]
+    end
 
-    SeriesSeason --> JellyfinServer["Jellyfin Media Server<br>(IMediaSourceProvider Multi-Quality)"]
-    SyncService -->|Trigger| LibraryScan["Jellyfin Library Scanner"]
+    subgraph Storage & Jellyfin
+        Linker --> FastDisk["Fast SSD/NVMe Storage<br>(.strm & .nfo files)"]
+        FastDisk -.->|Symlink Offloading| LibDir["Jellyfin TV Libraries<br>(One Pace, Naruto Kai, Bleach Kai, Re:Zero)"]
+        LibDir --> Player["Jellyfin Client Players<br>(IMediaSourceProvider Dynamic Picker)"]
+    end
 ```
 
 ---
 
-## ⚡ Key Features Breakdown
+## ⚙️ Configuration Reference
 
-### 1. Official Special Season Integration (Season 00 / Specials)
-The plugin scans Jellyfin libraries to locate your existing Re:Zero series (via TMDb ID `65942`, TVDb ID `305089`, or series folder matching). It creates or uses the `Season 00` folder and generates:
-- `Re ZERO Starting Life in Another World - S00E01 - [Arc 01] The Tumultuous First Day (Part 1).strm`
-- `Re ZERO Starting Life in Another World - S00E01 - [Arc 01] The Tumultuous First Day (Part 1).nfo`
+On a fresh install, all external providers default to `false` until enabled by the administrator in the Jellyfin Dashboard.
 
-All episodes are mapped sequentially across Arcs 1 through 6 (60 episodes in total).
-
-### 2. Zero Local Disk Overhead via `.strm` Direct Play
-Each `.strm` file contains a single HTTPS streaming URL:
-- **Direct MP4** (`https://media.rezeroperfect.run/downloads/ARC%2001/EP%201/...mp4`): Plays directly in Apple TV, Android TV, Roku, Chrome, and Smart TVs without transcoding.
-- **HLS** (`https://media.rezeroperfect.run/HLS/ARC%2001/.../index.m3u8`): Adaptive bitrate streaming.
-
-### 3. Audio & Subtitle Synchronization
-The plugin supports all four upstream permutations:
-- **Japanese Audio with Burned Subtitles (`jp` + `cc`)** *(Default)*
-- **English Audio with Burned Subtitles (`en` + `cc`)**
-- **Clean Japanese Audio (`jp` + `off`)**
-- **Clean English Audio (`en` + `off`)**
-- **Both**: Automatically generates multi-version files (e.g. `[JP Sub]` and `[EN Dub]`).
-
-### 4. Automated Update Engine
-The upstream project regularly publishes re-edits, subtitle timing adjustments, and new arcs. The plugin:
-- Polls `updates.json` every 12 hours (configurable).
-- Tracks the latest `LastUpdateGuid`.
-- Automatically re-generates `.strm` and `.nfo` files when an episode is marked as re-edited.
-
-### 5. Native Intro Skipper Integration
-Intro and outro segment timestamps from `episodes/arcXX.json` are serialized directly into the episode `.nfo` file:
-```xml
-<episodedetails>
-  <title>[The Perfect Run] Arc 01: The Tumultuous First Day - Episode 1</title>
-  <season>0</season>
-  <episode>1</episode>
-  <intro>
-    <start>116</start>
-    <end>206</end>
-  </intro>
-  <outro>
-    <start>1344</start>
-    <end>1434</end>
-  </outro>
-</episodedetails>
-```
-Jellyfin's **Intro Skipper** / **TheIntroDB** plugin instantly picks up these timestamps without needing audio fingerprinting!
-
----
-
-## ⚙️ Configuration Reference (`PluginConfiguration`)
-
+### Global Settings
 | Setting | Type | Default | Description |
 |---|---|---|---|
-| `IntegrationMode` | `string` | `"SpecialSeason"` | `"SpecialSeason"` or `"StandaloneSeries"`. |
-| `SyncMode` | `string` | `"Stream"` | `"Stream"` (zero-overhead `.strm` pointers) or `"Download"` (sequential native 1080p MP4 downloads). |
-| `MaxDownloadsPerRun` | `int` | `0` | Caps new MP4 downloads per sync run when `SyncMode` is `"Download"` (`0` = unlimited). |
-| `SkipExistingDownloads` | `bool` | `true` | Skips MP4 download when local file size matches upstream `Content-Length`. |
-| `CleanOppositeModeFiles` | `bool` | `true` | Removes matching `.strm` pointers after an MP4 download completes cleanly. |
-| `TargetSeriesPath` | `string` | `""` | Custom path to Re:Zero series directory (auto-detected if blank). |
-| `SeasonFolder` | `string` | `"Season 00"` | Subfolder inside series for the specials. |
-| `EnableSymlink` | `bool` | `true` | Stores `.strm`/`.nfo` files in a dedicated local folder and exposes them via symlink. |
-| `DedicatedStoragePath` | `string` | `""` | Optional manual dedicated local folder; blank enables dynamic auto-detection. |
-| `OfferAllQualitiesInPlayer` | `bool` | `true` | Dynamically supplies 1080p/720p/480p options in Jellyfin player UI. |
-| `EnableMultiVersionFiles` | `bool` | `false` | Writes separate physical `.strm` files per resolution on disk. |
-| `EnableAutoSync` | `bool` | `true` | Enables background periodic synchronization. |
-| `SyncIntervalHours` | `int` | `12` | Frequency of update checks (1–168 hours). |
-| `PreferredLanguage` | `string` | `"jp"` | `"jp"`, `"en"`, or `"both"`. |
-| `PreferredCaptions` | `string` | `"cc"` | `"cc"` (hardcoded subtitles), `"off"` (clean), or `"both"`. |
-| `PreferredQuality` | `string` | `"1080p"` | Stream resolution (`"1080p"`, `"720p"`, `"480p"`). |
-| `StreamFormat` | `string` | `"direct_mp4"` | `"direct_mp4"` or `"hls_m3u8"`. |
+| `OfferAllQualitiesInPlayer` | `bool` | `true` | Injects alternate streams (HLS, dubs, clean subs) into player menus. |
+| `EnableAutoSync` | `bool` | `true` | Background task checks for new releases periodically. |
+| `SyncIntervalHours` | `int` | `12` | Frequency of background synchronization (1–168 hours). |
+| `EnableSymlink` | `bool` | `true` | Uses fast local SSD for files and symlinks into library folders. |
+| `DedicatedStoragePath` | `string` | `""` | Directory for physical stream files (blank = auto-detect). |
+
+### Provider: Re:Zero - The Perfect Run
+| Setting | Type | Default | Description |
+|---|---|---|---|
+| `EnableRezero` | `bool` | `false` | Enables Re:Zero - The Perfect Run synchronization. |
+| `IntegrationMode` | `string` | `"SpecialSeason"` | `"SpecialSeason"` (Season 00 in existing show) or `"StandaloneSeries"`. |
+| `SyncMode` | `string` | `"Stream"` | `"Stream"` (.strm pointers) or `"Download"` (HTTPS MP4 downloads). |
+| `StreamFormat` | `string` | `"hls_auto"` | `"hls_auto"` (adaptive HLS master) or `"direct_mp4"`. |
+| `PreferredLanguage` | `string` | `"jp"` | `"jp"` (Japanese original) or `"en"` (English dub). |
+| `PreferredCaptions` | `string` | `"cc"` | `"cc"` (burned-in CC) or `"clean"` (no hardsubs). |
+
+### Provider: One Pace
+| Setting | Type | Default | Description |
+|---|---|---|---|
+| `EnableOnePace` | `bool` | `false` | Enables One Pace synchronization. |
+| `OnePaceIntegrationMode` | `string` | `"StandaloneSeries"` | `"StandaloneSeries"` (Seasons 1..34) or `"SpecialSeason"`. |
+| `OnePaceTargetLibraryPath`| `string` | `""` | Destination anime library folder (blank = auto-detect). |
+| `OnePacePreferredQuality` | `int` | `1080` | Preferred stream quality (`1080`, `720`). |
+| `OnePaceLanguage` | `string` | `"sub"` | `"sub"` (Japanese + English Subtitles) or `"dub"`. |
+| `OnePacePixeldrainApiKey` | `string` | `""` | Optional Pixeldrain Pro API key for higher rate limits. |
+
+### Provider: Naruto Kai & Bleach Kai
+| Setting | Type | Default | Description |
+|---|---|---|---|
+| `EnableNarutoKai` | `bool` | `false` | Enables 72-volume Naruto Kai synchronization. |
+| `NarutoKaiTargetLibraryPath` | `string` | `""` | Destination anime library folder. |
+| `NarutoKaiLanguage` | `string` | `"sub"` | `"sub"` (Japanese + Subs) or `"dub"`. |
+| `EnableBleachKai` | `bool` | `false` | Enables 36-volume Bleach Kai synchronization. |
+| `BleachKaiTargetLibraryPath` | `string` | `""` | Destination anime library folder. |
+| `BleachKaiLanguage` | `string` | `"sub"` | `"sub"` (Japanese + Subs) or `"dub"`. |
+
+### Provider: Consumet HLS Gateway
+| Setting | Type | Default | Description |
+|---|---|---|---|
+| `EnableConsumet` | `bool` | `false` | Enables on-demand scraping via Consumet container. |
+| `ConsumetApiUrl` | `string` | `"http://127.0.0.1:3000"` | Base URL to self-hosted Consumet instance. |
+| `ConsumetProvider` | `string` | `"gogoanime"` | Scraper provider (`"gogoanime"`, `"zoro"`, `"animepahe"`). |
+| `ConsumetSubscribedShows` | `string` | `""` | Comma-separated anime slugs (e.g. `"steinsgate, chainsaw-man"`). |
 
 ---
 
-## 📡 REST API & Scheduled Tasks
+## 📡 REST API & Backward Compatibility
 
-### Plugin Repository Manifest URL
-Add this repository URL in **Jellyfin Dashboard ➔ Plugins ➔ Manage Repositories**:
-```text
-https://raw.githubusercontent.com/FaserF/rezero-jellyfin/main/manifest.json
-```
-
-### REST Endpoints
-- **`GET /Rezero/Status`**: Returns sync state, active `SyncMode`, resolved storage paths, and configuration.
-- **`GET /Rezero/Updates`**: Fetches the live upstream changelog from `rezeroperfect.run`.
-- **`GET /Rezero/Downloads`**: Fetches the native download & `torrents.json` catalog.
-- **`POST /Rezero/Sync`**: Triggers immediate synchronization (supports optional `?syncMode=Stream|Download&maxDownloads=N&overrideSeriesPath=...` query overrides; requires Admin privileges).
-
-### Scheduled Task
-- Located in Jellyfin Dashboard under **Scheduled Tasks** ➔ **Live TV & Streaming** ➔ **Sync Re:Zero Perfect Run Episodes (.strm & .nfo)**.
+The plugin exposes full REST endpoints under `/AnimeKai/*` and maintains 100% backward compatibility with legacy `/Rezero/*` callers:
+- **`GET /AnimeKai/Status`** (or `/Rezero/Status`): Returns overall health, active providers, and episode counts.
+- **`GET /AnimeKai/Providers`**: Returns the list of registered stream providers and their current status.
+- **`POST /AnimeKai/Sync`** (or `/Rezero/Sync`): Triggers immediate multi-provider synchronization (supports optional `?provider=onepace` parameter).
+- **`GET /AnimeKai/Updates`** (or `/Rezero/Updates`): Fetches live upstream changelogs.
 
 ---
 
 ## 🛠️ Local Build & Development
 
-Run the Docker-based build script (no local .NET SDK required):
+Run the automated local test and build runner:
 ```powershell
 ./build-local.ps1
 ```
 
-Or using the .NET CLI:
+Or run via the .NET 10 SDK:
 ```bash
 dotnet restore
 dotnet build -c Release
@@ -183,6 +155,4 @@ dotnet test
 
 Licensed under the [MIT License](LICENSE).
 
-Developed and maintained by **[@FaserF](https://github.com/FaserF)**.
-- GitHub Sponsors: [faserf](https://github.com/sponsors/FaserF)
-- PayPal: [paypal.me/FaserF](https://paypal.me/FaserF)
+Maintained by **[@FaserF](https://github.com/FaserF)**.

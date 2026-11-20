@@ -1,18 +1,18 @@
 backend:
   - changed-files:
       - any-glob-to-any-file:
-          - 'Jellyfin.Plugin.Rezero/**/*.cs'
-          - 'Jellyfin.Plugin.Rezero/Jellyfin.Plugin.Rezero.csproj'
+          - 'Jellyfin.Plugin.AnimeKai/**/*.cs'
+          - 'Jellyfin.Plugin.AnimeKai/Jellyfin.Plugin.AnimeKai.csproj'
 
 frontend:
   - changed-files:
       - any-glob-to-any-file:
-          - 'Jellyfin.Plugin.Rezero/Configuration/**/*.html'
+          - 'Jellyfin.Plugin.AnimeKai/Configuration/**/*.html'
 
 tests:
   - changed-files:
       - any-glob-to-any-file:
-          - 'Jellyfin.Plugin.Rezero.Tests/**/*'
+          - 'Jellyfin.Plugin.AnimeKai.Tests/**/*'
 
 ci-cd:
   - changed-files:

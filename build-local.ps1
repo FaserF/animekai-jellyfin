@@ -1,4 +1,4 @@
-# Local build & test script for Jellyfin.Plugin.Rezero
+# Local build & test script for Jellyfin.Plugin.AnimeKai
 $ErrorActionPreference = "Stop"
 
 if (Test-Path "$env:USERPROFILE\.dotnet\dotnet.exe") {
@@ -13,7 +13,7 @@ if (Get-Command dotnet -ErrorAction SilentlyContinue) {
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         dotnet build -c Release --no-restore
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-        dotnet run --project Jellyfin.Plugin.Rezero.Tests -c Release --no-build
+        dotnet run --project Jellyfin.Plugin.AnimeKai.Tests -c Release --no-build
         if ($LASTEXITCODE -eq 0) {
             Write-Host "Local build & tests completed successfully!" -ForegroundColor Green
         }
@@ -23,7 +23,7 @@ if (Get-Command dotnet -ErrorAction SilentlyContinue) {
 
 Write-Host "Running local build via mcr.microsoft.com/dotnet/sdk:10.0..." -ForegroundColor Cyan
 $srcDir = $PWD.Path.Replace("\", "/")
-docker run --rm -v "${srcDir}:/src" -w /src mcr.microsoft.com/dotnet/sdk:10.0 bash -c "dotnet restore && dotnet build -c Release && dotnet run --project Jellyfin.Plugin.Rezero.Tests -c Release --no-build"
+docker run --rm -v "${srcDir}:/src" -w /src mcr.microsoft.com/dotnet/sdk:10.0 bash -c "dotnet restore && dotnet build -c Release && dotnet run --project Jellyfin.Plugin.AnimeKai.Tests -c Release --no-build"
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "Local build & tests completed successfully!" -ForegroundColor Green

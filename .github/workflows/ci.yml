@@ -46,24 +46,25 @@ jobs:
         run: dotnet build -c Release --no-restore
 
       - name: Run Unit Tests
-        run: dotnet run --project Jellyfin.Plugin.Rezero.Tests -c Release --no-build
+        run: dotnet run --project Jellyfin.Plugin.AnimeKai.Tests -c Release --no-build
 
       - name: Verify Package Assembly & Archive
         shell: bash
         run: |
           mkdir -p package_staging
-          cp Jellyfin.Plugin.Rezero/bin/Release/net10.0/Jellyfin.Plugin.Rezero.dll package_staging/
-          cp Jellyfin.Plugin.Rezero/bin/Release/net10.0/Jellyfin.Plugin.Rezero.pdb package_staging/
-          cp Jellyfin.Plugin.Rezero/*.png package_staging/ 2>/dev/null || true
+          cp Jellyfin.Plugin.AnimeKai/bin/Release/net10.0/Jellyfin.Plugin.AnimeKai.dll package_staging/
+          cp Jellyfin.Plugin.AnimeKai/bin/Release/net10.0/Jellyfin.Plugin.AnimeKai.pdb package_staging/
+          cp Jellyfin.Plugin.AnimeKai/bin/Release/net10.0/AngleSharp.dll package_staging/ 2>/dev/null || true
+          cp Jellyfin.Plugin.AnimeKai/*.png package_staging/ 2>/dev/null || true
           cp meta.json package_staging/ 2>/dev/null || true
           
           cd package_staging
-          zip -r ../rezero.zip .
+          zip -r ../animekai.zip .
           cd ..
           
           # Verify integrity
-          unzip -l rezero.zip
-          test -f rezero.zip
+          unzip -l animekai.zip
+          test -f animekai.zip
 
   lint-and-validate:
     name: Code Hygiene & Manifest Validation
@@ -84,8 +85,8 @@ jobs:
 
       - name: Validate Embedded Dashboard JavaScript Syntax
         run: |
-          python -c "import re, pathlib; html = pathlib.Path('Jellyfin.Plugin.Rezero/Configuration/configPage.html').read_text(encoding='utf-8'); m = re.search(r'<script[^>]*>(.*?)</script>', html, re.S); assert m; pathlib.Path('/tmp/rezero-config.js').write_text(m.group(1), encoding='utf-8')"
-          node --check /tmp/rezero-config.js
+          python -c "import re, pathlib; html = pathlib.Path('Jellyfin.Plugin.AnimeKai/Configuration/configPage.html').read_text(encoding='utf-8'); m = re.search(r'<script[^>]*>(.*?)</script>', html, re.S); assert m; pathlib.Path('/tmp/animekai-config.js').write_text(m.group(1), encoding='utf-8')"
+          node --check /tmp/animekai-config.js
 
       - name: Validate JSON Manifest
         run: |
