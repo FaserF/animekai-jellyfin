@@ -16,6 +16,7 @@ public class RezeroApiClient : IRezeroApiClient
     private const string DefaultSiteBaseUrl = "https://rezeroperfect.run/";
     private const string DefaultHlsBaseUrl = "https://media.rezeroperfect.run/HLS/";
     private const string DefaultDownloadsBaseUrl = "https://media.rezeroperfect.run/downloads/";
+    private const string DefaultTorrentsBaseUrl = "https://media.rezeroperfect.run/torrents/";
 
     private readonly HttpClient _httpClient;
     private readonly ILogger<RezeroApiClient> _logger;
@@ -96,6 +97,42 @@ public class RezeroApiClient : IRezeroApiClient
     }
 
     /// <inheritdoc />
+    public async Task<TorrentManifestDto?> GetTorrentManifestAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var torrentsBase = EnsureTrailingSlash(Plugin.Instance?.Configuration?.TorrentsBaseUrl, DefaultTorrentsBaseUrl);
+            var response = await _httpClient.GetAsync($"{torrentsBase}torrents.json", cancellationToken).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+
+            var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            return JsonSerializer.Deserialize<TorrentManifestDto>(json, _jsonOptions);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not retrieve torrents.json catalog");
+            return null;
+        }
+    }
+
+    /// <inheritdoc />
+    public string? ResolveDownloadUrl(
+        EpisodeDto episode,
+        ArcDto arc,
+        string language,
+        string captions)
+    {
+        var relativePath = SelectRelativeSourcePath(episode, language, captions, "1080p");
+        if (string.IsNullOrWhiteSpace(relativePath))
+        {
+            return null;
+        }
+
+        var downloadsBase = EnsureTrailingSlash(Plugin.Instance?.Configuration?.DownloadsBaseUrl, DefaultDownloadsBaseUrl);
+        return BuildDirectMp4Url(relativePath, downloadsBase);
+    }
+
+    /// <inheritdoc />
     public string? ResolveStreamUrl(
         EpisodeDto episode,
         ArcDto arc,
@@ -104,23 +141,7 @@ public class RezeroApiClient : IRezeroApiClient
         string quality,
         string format)
     {
-        if (episode.Sources == null || !episode.Sources.TryGetValue(language, out var captionDict))
-        {
-            return null;
-        }
-
-        if (!captionDict.TryGetValue(captions, out var resolutionDict))
-        {
-            return null;
-        }
-
-        if (!resolutionDict.TryGetValue(quality, out var relativePath) &&
-            !resolutionDict.TryGetValue("1080p", out relativePath) &&
-            !resolutionDict.TryGetValue("720p", out relativePath))
-        {
-            return null;
-        }
-
+        var relativePath = SelectRelativeSourcePath(episode, language, captions, quality);
         if (string.IsNullOrWhiteSpace(relativePath))
         {
             return null;
@@ -132,13 +153,9 @@ public class RezeroApiClient : IRezeroApiClient
         // Direct MP4 requested
         if (string.Equals(format, "direct_mp4", StringComparison.OrdinalIgnoreCase))
         {
-            var parts = relativePath.Split('?')[0].Split('/', StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length >= 5 && parts[^1] == "index.m3u8")
+            if (BuildDirectMp4Url(relativePath, downloadsBase) is { } directMp4Url)
             {
-                var arcPart = parts[^5];
-                var epPart = parts[^4];
-                var namePart = parts[^2];
-                return $"{downloadsBase}{arcPart}/{epPart}/{namePart}.mp4";
+                return directMp4Url;
             }
         }
 
@@ -146,6 +163,43 @@ public class RezeroApiClient : IRezeroApiClient
         return relativePath.StartsWith("http", StringComparison.OrdinalIgnoreCase)
             ? relativePath
             : $"{hlsBase}{relativePath.TrimStart('/')}";
+    }
+
+    private static string? SelectRelativeSourcePath(
+        EpisodeDto episode,
+        string language,
+        string captions,
+        string preferredQuality)
+    {
+        if (episode.Sources == null ||
+            !episode.Sources.TryGetValue(language, out var captionDict) ||
+            !captionDict.TryGetValue(captions, out var resolutionDict))
+        {
+            return null;
+        }
+
+        if (!resolutionDict.TryGetValue(preferredQuality, out var relativePath) &&
+            !resolutionDict.TryGetValue("1080p", out relativePath) &&
+            !resolutionDict.TryGetValue("720p", out relativePath))
+        {
+            resolutionDict.TryGetValue("480p", out relativePath);
+        }
+
+        return string.IsNullOrWhiteSpace(relativePath) ? null : relativePath;
+    }
+
+    private static string? BuildDirectMp4Url(string relativePath, string downloadsBase)
+    {
+        var parts = relativePath.Split('?')[0].Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 5 && parts[^1] == "index.m3u8")
+        {
+            var arcPart = parts[^5];
+            var epPart = parts[^4];
+            var namePart = parts[^2];
+            return $"{downloadsBase}{arcPart}/{epPart}/{namePart}.mp4";
+        }
+
+        return null;
     }
 
     private static string EnsureTrailingSlash(string? url, string fallback)

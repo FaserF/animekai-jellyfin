@@ -201,4 +201,59 @@ public class StoragePathResolverTests
         result.PhysicalStoragePath.Should().Be("/data/tv/ReZero/Season 00");
         result.TargetSeasonPath.Should().Be("/data/tv/ReZero/Season 00");
     }
+
+    [Fact]
+    public void Resolve_DownloadModeWithoutManualPath_ShouldTargetSeriesLibraryDirectly()
+    {
+        var mounts = StoragePathResolver.ParseProcMounts(OracleMounts);
+        var resolver = new StoragePathResolver(
+            getMounts: () => mounts,
+            resolveRealPath: p => p,
+            getLinkTarget: _ => null,
+            isDirectoryWritable: _ => true,
+            isNetworkPath: _ => false);
+
+        var config = new PluginConfiguration
+        {
+            SyncMode = "Download",
+            DedicatedStoragePath = string.Empty,
+            EnableSymlink = true
+        };
+
+        var result = resolver.Resolve(
+            config,
+            "/data/tv/Re - ZERO, Starting Life in Another World",
+            "Season 00",
+            "/config/data");
+
+        result.DetectionMode.Should().Be("Download (Library Target)");
+        result.UseSymlink.Should().BeFalse();
+        result.PhysicalStoragePath.Should().Be("/data/tv/Re - ZERO, Starting Life in Another World/Season 00");
+        result.PhysicalStoragePath.Should().NotContain("/config/data");
+        result.PhysicalStoragePath.Should().NotContain("/data/rezero");
+    }
+
+    [Fact]
+    public void Resolve_DownloadModeWithExplicitManualPath_ShouldHonorOverride()
+    {
+        var resolver = new StoragePathResolver(
+            getMounts: () => Array.Empty<MountEntry>(),
+            resolveRealPath: p => p,
+            getLinkTarget: _ => null,
+            isDirectoryWritable: _ => true,
+            isNetworkPath: _ => false);
+
+        var config = new PluginConfiguration
+        {
+            SyncMode = "Download",
+            DedicatedStoragePath = "/mnt/bigdisk/rezero",
+            EnableSymlink = true
+        };
+
+        var result = resolver.Resolve(config, "/data/tv/ReZero", "Season 00", "/config/data");
+
+        result.DetectionMode.Should().Be("Manual");
+        result.UseSymlink.Should().BeTrue();
+        result.PhysicalStoragePath.Should().Be("/mnt/bigdisk/rezero/Season 00");
+    }
 }

@@ -64,6 +64,10 @@ public class StoragePathResolver
                 Reason = useSym ? $"Using manual DedicatedStoragePath '{physical}'." : $"Writing directly to '{physical}'." };
         }
 
+        if (string.Equals(config.SyncMode, "Download", StringComparison.OrdinalIgnoreCase))
+            return new() { TargetSeasonPath = targetSeasonPath, PhysicalStoragePath = targetSeasonPath, UseSymlink = false, DetectionMode = "Download (Library Target)",
+                Reason = "Download mode stores full MP4 videos directly in the library season directory unless DedicatedStoragePath is explicitly set." };
+
         if (!config.EnableSymlink)
             return new() { TargetSeasonPath = targetSeasonPath, PhysicalStoragePath = targetSeasonPath, UseSymlink = false, DetectionMode = "Direct", Reason = "Symlink storage is disabled." };
 

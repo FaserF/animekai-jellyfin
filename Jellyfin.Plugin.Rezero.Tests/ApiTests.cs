@@ -115,4 +115,55 @@ public class ApiTests
         response.Updates[0].Changes.Should().HaveCount(1);
         response.Updates[0].Changes[0].Type.Should().Be("added");
     }
+
+    [Fact]
+    public void ResolveDownloadUrl_ShouldAlwaysResolveOfficial1080pMp4()
+    {
+        var client = new RezeroApiClient(new System.Net.Http.HttpClient(), NullLogger<RezeroApiClient>.Instance);
+        var arc = new ArcDto { Id = "arc02", Number = 2 };
+        var ep = new EpisodeDto
+        {
+            Number = 3,
+            Sources = new Dictionary<string, Dictionary<string, Dictionary<string, string>>>
+            {
+                ["jp"] = new()
+                {
+                    ["cc"] = new()
+                    {
+                        ["1080p"] = "ARC%2002/EP%203/1080p/ARC%2002%20-%20EP%203%20-%20JP%20BURNED%20CC/index.m3u8",
+                        ["720p"] = "ARC%2002/EP%203/720p/ARC%2002%20-%20EP%203%20-%20JP%20BURNED%20CC/index.m3u8"
+                    }
+                }
+            }
+        };
+
+        var url = client.ResolveDownloadUrl(ep, arc, "jp", "cc");
+        url.Should().Be("https://media.rezeroperfect.run/downloads/ARC%2002/EP%203/ARC%2002%20-%20EP%203%20-%20JP%20BURNED%20CC.mp4");
+    }
+
+    [Fact]
+    public void TorrentManifestDto_Deserialization_ShouldParseSeriesArcsAndEpisodes()
+    {
+        var sampleJson = """
+        {
+          "series": { "file": "Re ZERO -Perfect Run- [1080p].torrent", "size": 93784773502 },
+          "arcs": {
+            "ARC 01": { "file": "Re ZERO -Perfect Run- - ARC 01 [1080p].torrent", "size": 2382926842 }
+          },
+          "episodes": {
+            "ARC 01/EP 1": { "file": "Re ZERO -Perfect Run- - ARC 01 - EP 1 [1080p].torrent", "size": 1346836127 }
+          }
+        }
+        """;
+
+        var manifest = JsonSerializer.Deserialize<TorrentManifestDto>(sampleJson, new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        });
+
+        manifest.Should().NotBeNull();
+        manifest!.Series!.File.Should().Be("Re ZERO -Perfect Run- [1080p].torrent");
+        manifest.Arcs.Should().ContainKey("ARC 01");
+        manifest.Episodes["ARC 01/EP 1"].Size.Should().Be(1346836127);
+    }
 }

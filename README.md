@@ -125,6 +125,10 @@ Jellyfin's **Intro Skipper** / **TheIntroDB** plugin instantly picks up these ti
 | Setting | Type | Default | Description |
 |---|---|---|---|
 | `IntegrationMode` | `string` | `"SpecialSeason"` | `"SpecialSeason"` or `"StandaloneSeries"`. |
+| `SyncMode` | `string` | `"Stream"` | `"Stream"` (zero-overhead `.strm` pointers) or `"Download"` (sequential native 1080p MP4 downloads). |
+| `MaxDownloadsPerRun` | `int` | `0` | Caps new MP4 downloads per sync run when `SyncMode` is `"Download"` (`0` = unlimited). |
+| `SkipExistingDownloads` | `bool` | `true` | Skips MP4 download when local file size matches upstream `Content-Length`. |
+| `CleanOppositeModeFiles` | `bool` | `true` | Removes matching `.strm` pointers after an MP4 download completes cleanly. |
 | `TargetSeriesPath` | `string` | `""` | Custom path to Re:Zero series directory (auto-detected if blank). |
 | `SeasonFolder` | `string` | `"Season 00"` | Subfolder inside series for the specials. |
 | `EnableSymlink` | `bool` | `true` | Stores `.strm`/`.nfo` files in a dedicated local folder and exposes them via symlink. |
@@ -142,10 +146,17 @@ Jellyfin's **Intro Skipper** / **TheIntroDB** plugin instantly picks up these ti
 
 ## 📡 REST API & Scheduled Tasks
 
+### Plugin Repository Manifest URL
+Add this repository URL in **Jellyfin Dashboard ➔ Plugins ➔ Manage Repositories**:
+```text
+https://raw.githubusercontent.com/FaserF/rezero-jellyfin/main/manifest.json
+```
+
 ### REST Endpoints
-- **`GET /Rezero/Status`**: Returns sync state, total episodes, active paths, and configuration.
+- **`GET /Rezero/Status`**: Returns sync state, active `SyncMode`, resolved storage paths, and configuration.
 - **`GET /Rezero/Updates`**: Fetches the live upstream changelog from `rezeroperfect.run`.
-- **`POST /Rezero/Sync`**: Triggers immediate synchronization (requires Admin privileges).
+- **`GET /Rezero/Downloads`**: Fetches the native download & `torrents.json` catalog.
+- **`POST /Rezero/Sync`**: Triggers immediate synchronization (supports optional `?syncMode=Stream|Download&maxDownloads=N&overrideSeriesPath=...` query overrides; requires Admin privileges).
 
 ### Scheduled Task
 - Located in Jellyfin Dashboard under **Scheduled Tasks** ➔ **Live TV & Streaming** ➔ **Sync Re:Zero Perfect Run Episodes (.strm & .nfo)**.

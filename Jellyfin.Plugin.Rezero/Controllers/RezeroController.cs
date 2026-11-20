@@ -72,6 +72,10 @@ public class RezeroController : ControllerBase
             IsSymlinkActive = isSymlinkActive,
             DedicatedStoragePath = Config.DedicatedStoragePath,
             EnableSymlink = Config.EnableSymlink,
+            SyncMode = Config.SyncMode,
+            MaxDownloadsPerRun = Config.MaxDownloadsPerRun,
+            SkipExistingDownloads = Config.SkipExistingDownloads,
+            CleanOppositeModeFiles = Config.CleanOppositeModeFiles,
             LastSyncUtc = Config.LastSyncUtc,
             LastSyncStatus = Config.LastSyncStatus,
             TotalSyncedEpisodes = Config.TotalSyncedEpisodes,
@@ -95,22 +99,73 @@ public class RezeroController : ControllerBase
     }
 
     /// <summary>
-    /// Triggers an immediate synchronization run.
+    /// Fetches native 1080p MP4 download and BitTorrent manifest information from rezeroperfect.run.
+    /// </summary>
+    [HttpGet("Downloads")]
+    [Authorize(Policy = "DefaultAuthorization")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult<object>> GetDownloadsCatalog(CancellationToken cancellationToken)
+    {
+        var torrents = await _apiClient.GetTorrentManifestAsync(cancellationToken).ConfigureAwait(false);
+        return Ok(new
+        {
+            SyncMode = Config.SyncMode,
+            DownloadsBaseUrl = Config.DownloadsBaseUrl,
+            TorrentsBaseUrl = Config.TorrentsBaseUrl,
+            Series = torrents?.Series,
+            ArcsCount = torrents?.Arcs?.Count ?? 0,
+            EpisodesCount = torrents?.Episodes?.Count ?? 0,
+            Arcs = torrents?.Arcs
+        });
+    }
+
+    /// <summary>
+    /// Triggers an immediate synchronization run (optionally using transient overrides without mutating saved settings).
     /// </summary>
     [HttpPost("Sync")]
     [Authorize(Policy = "RequiresElevation")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<object>> TriggerSync(CancellationToken cancellationToken)
+    public async Task<ActionResult<object>> TriggerSync(
+        [FromQuery] string? syncMode = null,
+        [FromQuery] int? maxDownloads = null,
+        [FromQuery] string? overrideSeriesPath = null,
+        CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Manual Re:Zero sync triggered via API");
+        _logger.LogInformation("Manual Re:Zero sync triggered via API (syncMode={Mode}, maxDownloads={Max}, overridePath={Path})", syncMode ?? Config.SyncMode, maxDownloads, overrideSeriesPath);
         try
         {
-            var count = await _syncService.SyncEpisodesAsync(cancellationToken).ConfigureAwait(false);
+            PluginConfiguration? overrideConfig = null;
+            if (!string.IsNullOrWhiteSpace(syncMode) || maxDownloads.HasValue || !string.IsNullOrWhiteSpace(overrideSeriesPath))
+            {
+                overrideConfig = Config.Clone();
+                if (!string.IsNullOrWhiteSpace(syncMode))
+                {
+                    overrideConfig.SyncMode = syncMode.Trim();
+                }
+
+                if (maxDownloads.HasValue)
+                {
+                    overrideConfig.MaxDownloadsPerRun = Math.Max(0, maxDownloads.Value);
+                }
+
+                if (!string.IsNullOrWhiteSpace(overrideSeriesPath))
+                {
+                    overrideConfig.TargetSeriesPath = overrideSeriesPath.Trim();
+                    overrideConfig.DedicatedStoragePath = string.Empty;
+                }
+            }
+
+            var effectiveMode = overrideConfig?.SyncMode ?? Config.SyncMode;
+            var count = overrideConfig != null
+                ? await _syncService.SyncEpisodesAsync(overrideConfig, cancellationToken).ConfigureAwait(false)
+                : await _syncService.SyncEpisodesAsync(cancellationToken).ConfigureAwait(false);
+
             return Ok(new
             {
                 Success = true,
-                Message = $"Synchronized {count} streaming episodes successfully.",
+                SyncMode = effectiveMode,
+                Message = $"Synchronized {count} {(string.Equals(effectiveMode, "Download", StringComparison.OrdinalIgnoreCase) ? "downloaded" : "streaming")} episodes successfully.",
                 Count = count
             });
         }

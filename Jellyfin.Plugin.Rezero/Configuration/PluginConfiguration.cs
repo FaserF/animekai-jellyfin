@@ -131,7 +131,65 @@ public class PluginConfiguration : BasePluginConfiguration
     public string LastSyncStatus { get; set; } = "Not yet synchronized";
 
     /// <summary>
+    /// Gets or sets the synchronization mode ("Stream" for .strm pointers [Default] or "Download" for native 1080p MP4 downloads).
+    /// </summary>
+    public string SyncMode { get; set; } = "Stream";
+
+    /// <summary>
+    /// Gets or sets the maximum number of new MP4 downloads per sync run in Download mode (0 = unlimited).
+    /// </summary>
+    public int MaxDownloadsPerRun { get; set; } = 0;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether already-downloaded MP4 files matching remote size should be skipped.
+    /// </summary>
+    public bool SkipExistingDownloads { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether opposite-mode generated .strm pointers should be removed after an MP4 is downloaded.
+    /// </summary>
+    public bool CleanOppositeModeFiles { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the Torrents CDN base URL.
+    /// </summary>
+    public string TorrentsBaseUrl { get; set; } = "https://media.rezeroperfect.run/torrents/";
+
+    /// <summary>
     /// Gets or sets the total count of currently synchronized episodes.
     /// </summary>
     public int TotalSyncedEpisodes { get; set; } = 0;
+
+    internal PluginConfiguration Clone() => new()
+    {
+        IntegrationMode = IntegrationMode,
+        MatchingStrategy = MatchingStrategy,
+        TargetSeriesPath = TargetSeriesPath,
+        StandaloneLibraryPath = StandaloneLibraryPath,
+        StandaloneSeriesTitle = StandaloneSeriesTitle,
+        SeasonNumber = SeasonNumber,
+        SeasonFolder = SeasonFolder,
+        DedicatedStoragePath = DedicatedStoragePath,
+        EnableSymlink = EnableSymlink,
+        OfferAllQualitiesInPlayer = OfferAllQualitiesInPlayer,
+        EnableMultiVersionFiles = EnableMultiVersionFiles,
+        PreferredLanguage = PreferredLanguage,
+        PreferredCaptions = PreferredCaptions,
+        PreferredQuality = PreferredQuality,
+        StreamFormat = StreamFormat,
+        ApiBaseUrl = ApiBaseUrl,
+        HlsBaseUrl = HlsBaseUrl,
+        DownloadsBaseUrl = DownloadsBaseUrl,
+        EnableAutoSync = EnableAutoSync,
+        SyncIntervalHours = SyncIntervalHours,
+        LastUpdateGuid = LastUpdateGuid,
+        LastSyncUtc = LastSyncUtc,
+        LastSyncStatus = LastSyncStatus,
+        TotalSyncedEpisodes = TotalSyncedEpisodes,
+        SyncMode = SyncMode,
+        MaxDownloadsPerRun = MaxDownloadsPerRun,
+        SkipExistingDownloads = SkipExistingDownloads,
+        CleanOppositeModeFiles = CleanOppositeModeFiles,
+        TorrentsBaseUrl = TorrentsBaseUrl
+    };
 }

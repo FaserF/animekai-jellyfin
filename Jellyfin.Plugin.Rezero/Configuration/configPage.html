@@ -53,6 +53,42 @@
                     </div>
 
                     <div class="verticalSection">
+                        <h2>Sync Mode (Stream vs. Download)</h2>
+                        <div class="selectContainer">
+                            <label class="selectLabel" for="selectSyncMode">Synchronization Mode</label>
+                            <select is="emby-select" id="selectSyncMode" name="SyncMode" class="emby-select">
+                                <option value="Stream">Stream (.strm pointers &mdash; zero video disk usage, Default)</option>
+                                <option value="Download">Download (Full 1080p MP4 files downloaded sequentially)</option>
+                            </select>
+                            <div class="fieldDescription">rezeroperfect.run natively provides both streaming and 1080p MP4 downloads. Downloads are processed sequentially on a single connection to respect upstream server slot limits.</div>
+                        </div>
+
+                        <div id="containerDownloadOptions" style="display: none; padding-left: 12px; border-left: 2px solid #00a4dc; margin-bottom: 16px;">
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="txtMaxDownloadsPerRun">Max New Downloads Per Run (0 = Unlimited)</label>
+                                <input is="emby-input" type="number" id="txtMaxDownloadsPerRun" name="MaxDownloadsPerRun" class="emby-input" min="0" max="60" value="0" />
+                                <div class="fieldDescription">Useful for incremental batching (~1 GB per 1080p episode, ~90 GB full series).</div>
+                            </div>
+
+                            <div class="checkboxContainer checkboxContainer-withDescription">
+                                <label class="emby-checkbox-label">
+                                    <input is="emby-checkbox" type="checkbox" id="chkSkipExistingDownloads" name="SkipExistingDownloads" checked />
+                                    <span>Skip Existing Verified MP4 Files</span>
+                                </label>
+                                <div class="fieldDescription checkboxFieldDescription">Verifies local file size against upstream Content-Length before skipping; automatically re-downloads if an episode is re-edited.</div>
+                            </div>
+
+                            <div class="checkboxContainer checkboxContainer-withDescription">
+                                <label class="emby-checkbox-label">
+                                    <input is="emby-checkbox" type="checkbox" id="chkCleanOppositeModeFiles" name="CleanOppositeModeFiles" checked />
+                                    <span>Remove .strm Pointer After MP4 Download</span>
+                                </label>
+                                <div class="fieldDescription checkboxFieldDescription">Cleans up matching .strm files once the local MP4 completes so Jellyfin does not show duplicate entries.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="verticalSection">
                         <h2>Storage &amp; Efficiency (Dedicated Folder &amp; Symlink)</h2>
                         <div class="checkboxContainer checkboxContainer-withDescription">
                             <label class="emby-checkbox-label">
@@ -185,6 +221,13 @@
                 }
             }
 
+            function updateSyncModeVisibility(syncMode) {
+                var dlContainer = document.querySelector("#containerDownloadOptions");
+                if (dlContainer) {
+                    dlContainer.style.display = syncMode === "Download" ? "block" : "none";
+                }
+            }
+
             function loadConfig(page) {
                 Dashboard.showLoadingMsg();
                 ApiClient.getPluginConfiguration(pluginId).then(function (config) {
@@ -193,6 +236,10 @@
                     page.querySelector("#txtStandaloneLibraryPath").value = config.StandaloneLibraryPath || "";
                     page.querySelector("#txtSeasonFolder").value = config.SeasonFolder || "Season 00";
                     page.querySelector("#txtSeasonNumber").value = config.SeasonNumber !== undefined ? config.SeasonNumber : 0;
+                    page.querySelector("#selectSyncMode").value = config.SyncMode || "Stream";
+                    page.querySelector("#txtMaxDownloadsPerRun").value = config.MaxDownloadsPerRun !== undefined ? config.MaxDownloadsPerRun : 0;
+                    page.querySelector("#chkSkipExistingDownloads").checked = config.SkipExistingDownloads !== false;
+                    page.querySelector("#chkCleanOppositeModeFiles").checked = config.CleanOppositeModeFiles !== false;
                     page.querySelector("#chkEnableSymlink").checked = config.EnableSymlink !== false;
                     page.querySelector("#txtDedicatedStoragePath").value = config.DedicatedStoragePath || "";
                     page.querySelector("#chkOfferAllQualitiesInPlayer").checked = config.OfferAllQualitiesInPlayer !== false;
@@ -206,6 +253,7 @@
                     page.querySelector("#txtApiBaseUrl").value = config.ApiBaseUrl || "https://rezeroperfect.run/";
 
                     updateModeVisibility(config.IntegrationMode || "SpecialSeason");
+                    updateSyncModeVisibility(config.SyncMode || "Stream");
                     Dashboard.hideLoadingMsg();
                 });
 
@@ -214,6 +262,7 @@
                     var lastSyncUtc = status.lastSyncUtc || status.LastSyncUtc;
                     var lastSync = lastSyncUtc ? new Date(lastSyncUtc).toLocaleString() : "Never";
                     var syncStatus = status.lastSyncStatus || status.LastSyncStatus || "Idle";
+                    var syncMode = status.syncMode || status.SyncMode || "Stream";
                     var totalEpisodes = status.totalSyncedEpisodes !== undefined ? status.totalSyncedEpisodes : (status.TotalSyncedEpisodes || 0);
                     var seriesPath = status.seriesPath || status.SeriesPath || "Auto-detecting...";
                     var resolvedStorage = status.resolvedStoragePath || status.ResolvedStoragePath || "Auto-detecting...";
@@ -222,6 +271,7 @@
                     var symlinkActive = status.isSymlinkActive !== undefined ? status.isSymlinkActive : status.IsSymlinkActive;
                     var symlinkText = useSymlink ? (symlinkActive ? "Active Symlink" : "Symlink Pending Sync") : "Direct Write";
                     statusEl.innerHTML = "<strong>Status:</strong> " + syncStatus +
+                        "<br><strong>Sync Mode:</strong> " + syncMode +
                         "<br><strong>Episodes Synced:</strong> " + totalEpisodes +
                         "<br><strong>Series Path:</strong> " + seriesPath +
                         "<br><strong>Physical Storage:</strong> " + resolvedStorage + " (" + detectionMode + " &bull; " + symlinkText + ")" +
@@ -262,6 +312,10 @@
                     updateModeVisibility(this.value);
                 });
 
+                page.querySelector("#selectSyncMode").addEventListener("change", function () {
+                    updateSyncModeVisibility(this.value);
+                });
+
                 page.querySelector("#rezeroConfigForm").addEventListener("submit", function (e) {
                     e.preventDefault();
                     Dashboard.showLoadingMsg();
@@ -271,6 +325,10 @@
                         config.StandaloneLibraryPath = page.querySelector("#txtStandaloneLibraryPath").value;
                         config.SeasonFolder = page.querySelector("#txtSeasonFolder").value;
                         config.SeasonNumber = parseInt(page.querySelector("#txtSeasonNumber").value, 10) || 0;
+                        config.SyncMode = page.querySelector("#selectSyncMode").value;
+                        config.MaxDownloadsPerRun = parseInt(page.querySelector("#txtMaxDownloadsPerRun").value, 10) || 0;
+                        config.SkipExistingDownloads = page.querySelector("#chkSkipExistingDownloads").checked;
+                        config.CleanOppositeModeFiles = page.querySelector("#chkCleanOppositeModeFiles").checked;
                         config.EnableSymlink = page.querySelector("#chkEnableSymlink").checked;
                         config.DedicatedStoragePath = page.querySelector("#txtDedicatedStoragePath").value;
                         config.OfferAllQualitiesInPlayer = page.querySelector("#chkOfferAllQualitiesInPlayer").checked;

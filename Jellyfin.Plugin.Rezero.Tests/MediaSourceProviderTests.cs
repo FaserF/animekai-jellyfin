@@ -118,4 +118,19 @@ public class MediaSourceProviderTests
 
         sources.Should().BeEmpty();
     }
+
+    [Fact]
+    public async Task GetMediaSources_LocalMp4Download_ShouldReturnEmptySoNativeFilePlaysDirectly()
+    {
+        var provider = new RezeroMediaSourceProvider(NullLogger<RezeroMediaSourceProvider>.Instance);
+
+        var episode = new Episode
+        {
+            Path = "/data/tv/Re - ZERO, Starting Life in Another World/Season 00/Re ZERO Starting Life in Another World - S00E01 - [Arc 01] Episode 1.mp4"
+        };
+
+        var sources = (await provider.GetMediaSources(episode, TestContext.Current.CancellationToken)).ToList();
+
+        sources.Should().BeEmpty();
+    }
 }

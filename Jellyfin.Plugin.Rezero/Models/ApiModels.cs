@@ -128,3 +128,53 @@ public class UpdateChangeDto
     [JsonPropertyName("text")]
     public string Text { get; set; } = string.Empty;
 }
+
+/// <summary>
+/// Upstream torrent manifest returned by torrents.json.
+/// </summary>
+public class TorrentManifestDto
+{
+    [JsonPropertyName("series")]
+    public TorrentEntryDto? Series { get; set; }
+
+    [JsonPropertyName("arcs")]
+    public Dictionary<string, TorrentEntryDto> Arcs { get; set; } = new();
+
+    [JsonPropertyName("episodes")]
+    public Dictionary<string, TorrentEntryDto> Episodes { get; set; } = new();
+}
+
+/// <summary>
+/// Single torrent file descriptor with expected payload size in bytes.
+/// </summary>
+public class TorrentEntryDto
+{
+    [JsonPropertyName("file")]
+    public string File { get; set; } = string.Empty;
+
+    [JsonPropertyName("size")]
+    public long Size { get; set; }
+}
+
+/// <summary>
+/// Outcome status of a single episode MP4 download attempt.
+/// </summary>
+public enum DownloadOutcome
+{
+    Downloaded,
+    SkippedExisting,
+    Blocked,
+    Missing,
+    BusyTimeout,
+    Failed
+}
+
+/// <summary>
+/// Result details for a single downloaded or skipped episode file.
+/// </summary>
+public sealed record EpisodeDownloadResult(
+    bool Succeeded,
+    bool Skipped,
+    DownloadOutcome Outcome,
+    long BytesDownloaded,
+    string? ErrorMessage = null);

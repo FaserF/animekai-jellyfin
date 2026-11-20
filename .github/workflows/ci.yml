@@ -80,11 +80,12 @@ jobs:
 
       - name: Validate Python Scripts
         run: |
-          python -m py_compile .github/scripts/*.py
+          python -m py_compile .github/scripts/*.py tools/*.py
 
-      - name: Validate JavaScript Syntax
+      - name: Validate Embedded Dashboard JavaScript Syntax
         run: |
-          node --check Jellyfin.Plugin.Rezero/Features/Script/embyPlugin.js
+          python -c "import re, pathlib; html = pathlib.Path('Jellyfin.Plugin.Rezero/Configuration/configPage.html').read_text(encoding='utf-8'); m = re.search(r'<script[^>]*>(.*?)</script>', html, re.S); assert m; pathlib.Path('/tmp/rezero-config.js').write_text(m.group(1), encoding='utf-8')"
+          node --check /tmp/rezero-config.js
 
       - name: Validate JSON Manifest
         run: |

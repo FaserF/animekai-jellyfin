@@ -7,7 +7,6 @@ backend:
 frontend:
   - changed-files:
       - any-glob-to-any-file:
-          - 'Jellyfin.Plugin.Rezero/Features/Script/**/*.js'
           - 'Jellyfin.Plugin.Rezero/Configuration/**/*.html'
 
 tests:

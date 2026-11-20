@@ -22,7 +22,7 @@ on:
           - minor
           - major
       version_override:
-        description: "Manually override new version (e.g. 1.0.1.0). Leave empty for auto calculation."
+        description: "Manually override new version (e.g. 0.1.0 or 1.0.1.0). Leave empty for auto calculation."
         required: false
         type: string
 
@@ -40,6 +40,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       version: ${{ steps.calc.outputs.version }}
+      assembly_version: ${{ steps.calc.outputs.assembly_version }}
       tag: ${{ steps.calc.outputs.tag }}
       is_prerelease: ${{ steps.calc.outputs.is_prerelease }}
       from_tag: ${{ steps.calc.outputs.from_tag }}
@@ -58,21 +59,34 @@ jobs:
           OVERRIDE: ${{ github.event.inputs.version_override }}
         run: |
           git fetch --tags --force 2>/dev/null || true
-          
+
           LATEST_TAG=$(git tag -l "v*" --sort=-v:refname 2>/dev/null | head -n 1)
           echo "Latest tag: ${LATEST_TAG}"
           echo "from_tag=${LATEST_TAG}" >> $GITHUB_OUTPUT
 
           if [ -n "$OVERRIDE" ]; then
-            VERSION="$OVERRIDE"
+            RAW_VER="${OVERRIDE#v}"
+            DOTS=$(printf '%s' "$RAW_VER" | tr -cd '.' | wc -c)
+            if [ "$DOTS" -eq 2 ]; then
+              DISPLAY_VER="$RAW_VER"
+              ASSEMBLY_VERSION="${RAW_VER}.0"
+            elif [ "$DOTS" -eq 1 ]; then
+              DISPLAY_VER="${RAW_VER}.0"
+              ASSEMBLY_VERSION="${RAW_VER}.0.0"
+            else
+              DISPLAY_VER="$RAW_VER"
+              ASSEMBLY_VERSION="$RAW_VER"
+            fi
           elif [ -n "$LATEST_TAG" ]; then
             CLEAN_VER="${LATEST_TAG#v}"
+            CLEAN_VER="${CLEAN_VER%%-*}"
+            CLEAN_VER="${CLEAN_VER%%+*}"
             IFS='.' read -r MAJOR MINOR PATCH BUILD <<< "$CLEAN_VER"
-            MAJOR=${MAJOR:-1}
-            MINOR=${MINOR:-0}
+            MAJOR=${MAJOR:-0}
+            MINOR=${MINOR:-1}
             PATCH=${PATCH:-0}
             BUILD=${BUILD:-0}
-            
+
             if [ "$BUMP_LEVEL" = "major" ]; then
               MAJOR=$((MAJOR + 1))
               MINOR=0
@@ -85,26 +99,29 @@ jobs:
             else
               PATCH=$((PATCH + 1))
             fi
-            VERSION="${MAJOR}.${MINOR}.${PATCH}.${BUILD}"
+            DISPLAY_VER="${MAJOR}.${MINOR}.${PATCH}.${BUILD}"
+            ASSEMBLY_VERSION="$DISPLAY_VER"
           else
-            VERSION="1.0.0.0"
+            DISPLAY_VER="0.1.0"
+            ASSEMBLY_VERSION="0.1.0.0"
           fi
 
           if [ "$RELEASE_TYPE" = "beta" ]; then
-            TAG="v${VERSION}-beta"
+            TAG="v${DISPLAY_VER}-beta"
             IS_PRE="true"
           elif [ "$RELEASE_TYPE" = "nightly" ]; then
             SHA=$(git rev-parse --short HEAD)
-            TAG="v${VERSION}-nightly+${SHA}"
+            TAG="v${DISPLAY_VER}-nightly+${SHA}"
             IS_PRE="true"
           else
-            TAG="v${VERSION}"
+            TAG="v${DISPLAY_VER}"
             IS_PRE="false"
           fi
 
-          echo "Calculated version: $VERSION"
+          echo "Calculated version: $DISPLAY_VER (assembly: $ASSEMBLY_VERSION)"
           echo "Calculated tag: $TAG"
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "version=$DISPLAY_VER" >> $GITHUB_OUTPUT
+          echo "assembly_version=$ASSEMBLY_VERSION" >> $GITHUB_OUTPUT
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "is_prerelease=$IS_PRE" >> $GITHUB_OUTPUT
 
@@ -139,25 +156,30 @@ jobs:
       - name: Build Plugin (Release)
         run: |
           dotnet restore
-          dotnet build -c Release -p:Version=${{ needs.determine-version.outputs.version }} -p:AssemblyVersion=${{ needs.determine-version.outputs.version }} -p:FileVersion=${{ needs.determine-version.outputs.version }}
+          dotnet build -c Release -p:Version=${{ needs.determine-version.outputs.assembly_version }} -p:AssemblyVersion=${{ needs.determine-version.outputs.assembly_version }} -p:FileVersion=${{ needs.determine-version.outputs.assembly_version }}
 
       - name: Run Tests
         run: |
           dotnet run --project Jellyfin.Plugin.Rezero.Tests -c Release --no-build
 
-      - name: Package Plugin Archive
+      - name: Update meta.json and Package Plugin Archive
         shell: bash
         run: |
+          python .github/scripts/update_manifest.py \
+            --update-meta meta.json \
+            --version "${{ needs.determine-version.outputs.assembly_version }}" \
+            --changelog-file CHANGELOG_SUMMARY.txt
+
           mkdir -p dist
           cp Jellyfin.Plugin.Rezero/bin/Release/net10.0/Jellyfin.Plugin.Rezero.dll dist/
           cp Jellyfin.Plugin.Rezero/bin/Release/net10.0/Jellyfin.Plugin.Rezero.pdb dist/
           cp Jellyfin.Plugin.Rezero/*.png dist/ 2>/dev/null || true
-          cp meta.json dist/ 2>/dev/null || true
-          
+          cp meta.json dist/
+
           cd dist
           zip -9 -r ../rezero.zip .
           cd ..
-          
+
           md5sum rezero.zip > checksums.txt
           sha256sum rezero.zip >> checksums.txt
           cat checksums.txt
@@ -167,16 +189,17 @@ jobs:
           python .github/scripts/update_manifest.py \
             --manifest-path manifest.json \
             --zip-path rezero.zip \
-            --version "${{ needs.determine-version.outputs.version }}" \
+            --version "${{ needs.determine-version.outputs.assembly_version }}" \
+            --tag "${{ needs.determine-version.outputs.tag }}" \
             --changelog-file CHANGELOG_SUMMARY.txt \
             --repo "${{ github.repository }}"
 
-      - name: Commit and Push Updated Manifest
+      - name: Commit and Push Updated Metadata & Manifest
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add manifest.json
+          git add manifest.json meta.json
           if ! git diff --staged --quiet; then
             git commit -m "chore(release): bump manifest to ${{ needs.determine-version.outputs.version }} [skip ci]"
             git push origin HEAD:main

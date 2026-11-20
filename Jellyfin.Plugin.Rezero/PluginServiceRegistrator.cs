@@ -1,11 +1,11 @@
 using System;
+using System.Threading;
 using Jellyfin.Plugin.Rezero.Api;
 using Jellyfin.Plugin.Rezero.Providers;
 using Jellyfin.Plugin.Rezero.Services;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Plugins;
-using MediaBrowser.Controller.Providers;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Jellyfin.Plugin.Rezero;
@@ -24,7 +24,13 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
             var baseUrl = !string.IsNullOrWhiteSpace(config?.ApiBaseUrl) ? config.ApiBaseUrl : "https://rezeroperfect.run/";
             client.BaseAddress = new Uri(baseUrl);
             client.Timeout = TimeSpan.FromSeconds(30);
-            client.DefaultRequestHeaders.Add("User-Agent", "Jellyfin.Plugin.Rezero/1.0");
+            client.DefaultRequestHeaders.Add("User-Agent", "Jellyfin.Plugin.Rezero/0.1");
+        });
+
+        serviceCollection.AddHttpClient<IRezeroDownloadService, RezeroDownloadService>(client =>
+        {
+            client.Timeout = Timeout.InfiniteTimeSpan;
+            client.DefaultRequestHeaders.Add("User-Agent", "Jellyfin.Plugin.Rezero/0.1");
         });
 
         serviceCollection.AddSingleton<IRezeroSyncService, RezeroSyncService>();

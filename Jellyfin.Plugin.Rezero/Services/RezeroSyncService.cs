@@ -5,7 +5,6 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Xml.Linq;
 using Jellyfin.Plugin.Rezero.Api;
 using Jellyfin.Plugin.Rezero.Configuration;
 using Jellyfin.Plugin.Rezero.Models;
@@ -16,14 +15,14 @@ using Microsoft.Extensions.Logging;
 namespace Jellyfin.Plugin.Rezero.Services;
 
 /// <summary>
-/// Universal implementation of the Re:Zero Perfect Run streaming synchronizer.
-/// Supports both Special Season integration and Standalone Series creation across any environment.
+/// Universal implementation of the Re:Zero Perfect Run synchronizer supporting both Stream (.strm) and Download (1080p MP4) modes.
 /// </summary>
 public class RezeroSyncService : IRezeroSyncService
 {
     private static readonly char[] InvalidFileNameChars = Path.GetInvalidFileNameChars();
 
     private readonly IRezeroApiClient _apiClient;
+    private readonly IRezeroDownloadService _downloadService;
     private readonly ILibraryManager? _libraryManager;
     private readonly IApplicationPaths? _applicationPaths;
     private readonly ILogger<RezeroSyncService> _logger;
@@ -35,15 +34,17 @@ public class RezeroSyncService : IRezeroSyncService
     /// </summary>
     public RezeroSyncService(
         IRezeroApiClient apiClient,
+        IRezeroDownloadService downloadService,
         ILogger<RezeroSyncService> logger,
         ILibraryManager? libraryManager = null,
         IApplicationPaths? applicationPaths = null)
-        : this(apiClient, logger, libraryManager, applicationPaths, null, null)
+        : this(apiClient, downloadService, logger, libraryManager, applicationPaths, null, null)
     {
     }
 
     internal RezeroSyncService(
         IRezeroApiClient apiClient,
+        IRezeroDownloadService downloadService,
         ILogger<RezeroSyncService> logger,
         ILibraryManager? libraryManager,
         IApplicationPaths? applicationPaths,
@@ -51,12 +52,16 @@ public class RezeroSyncService : IRezeroSyncService
         PluginConfiguration? configOverride)
     {
         _apiClient = apiClient;
+        _downloadService = downloadService;
         _logger = logger;
         _libraryManager = libraryManager;
         _applicationPaths = applicationPaths;
         _storagePathResolver = storagePathResolver ?? new StoragePathResolver();
         _configOverride = configOverride;
     }
+
+    /// <inheritdoc />
+    public string? ResolveSeriesPath() => ResolveSeriesPathInternal(_configOverride ?? Plugin.Instance?.Configuration, allowCreateExplicitTarget: false);
 
     /// <inheritdoc />
     public StorageResolutionResult? ResolveStoragePaths()
@@ -67,7 +72,7 @@ public class RezeroSyncService : IRezeroSyncService
             return null;
         }
 
-        var seriesPath = ResolveSeriesPath();
+        var seriesPath = ResolveSeriesPathInternal(config, allowCreateExplicitTarget: false);
         if (string.IsNullOrWhiteSpace(seriesPath))
         {
             return null;
@@ -78,22 +83,30 @@ public class RezeroSyncService : IRezeroSyncService
     }
 
     /// <inheritdoc />
-    public async Task<int> SyncEpisodesAsync(CancellationToken cancellationToken = default, IProgress<double>? progress = null)
+    public Task<int> SyncEpisodesAsync(CancellationToken cancellationToken = default, IProgress<double>? progress = null) =>
+        SyncEpisodesAsync(null, cancellationToken, progress);
+
+    /// <inheritdoc />
+    public async Task<int> SyncEpisodesAsync(
+        PluginConfiguration? runtimeConfigOverride,
+        CancellationToken cancellationToken = default,
+        IProgress<double>? progress = null)
     {
-        var config = _configOverride ?? Plugin.Instance?.Configuration;
+        var isEphemeralRun = runtimeConfigOverride != null || _configOverride != null;
+        var config = runtimeConfigOverride ?? _configOverride ?? Plugin.Instance?.Configuration;
         if (config == null)
         {
             _logger.LogError("Re:Zero plugin configuration is not loaded");
             return 0;
         }
 
-        var seriesPath = ResolveSeriesPath();
+        var seriesPath = ResolveSeriesPathInternal(config, allowCreateExplicitTarget: isEphemeralRun);
         if (string.IsNullOrWhiteSpace(seriesPath))
         {
             var msg = "Target series path could not be resolved. Configure TargetSeriesPath or StandaloneLibraryPath in settings.";
             _logger.LogWarning(msg);
             config.LastSyncStatus = msg;
-            SaveConfig();
+            SaveConfig(isEphemeralRun);
             return 0;
         }
 
@@ -103,7 +116,6 @@ public class RezeroSyncService : IRezeroSyncService
             _logger.LogInformation("Created target series directory: {Path}", seriesPath);
         }
 
-        // If Standalone Series mode, create tvshow.nfo if not present
         var isStandalone = string.Equals(config.IntegrationMode, "StandaloneSeries", StringComparison.OrdinalIgnoreCase);
         if (isStandalone)
         {
@@ -111,59 +123,83 @@ public class RezeroSyncService : IRezeroSyncService
             if (!File.Exists(tvshowNfoPath))
             {
                 var title = string.IsNullOrWhiteSpace(config.StandaloneSeriesTitle) ? "Re:Zero - The Perfect Run" : config.StandaloneSeriesTitle;
-                var tvshowNfo = BuildTvShowNfo(title);
-                await File.WriteAllTextAsync(tvshowNfoPath, tvshowNfo, Encoding.UTF8, cancellationToken).ConfigureAwait(false);
+                await File.WriteAllTextAsync(tvshowNfoPath, RezeroStorageLinker.BuildTvShowNfo(title), Encoding.UTF8, cancellationToken).ConfigureAwait(false);
             }
         }
 
         var seasonFolder = string.IsNullOrWhiteSpace(config.SeasonFolder) ? "Season 00" : config.SeasonFolder;
         var resolution = _storagePathResolver.Resolve(config, seriesPath, seasonFolder, _applicationPaths?.DataPath);
+        var isDownloadMode = string.Equals(config.SyncMode, "Download", StringComparison.OrdinalIgnoreCase);
+
         _logger.LogInformation(
-            "Resolved storage layout ({Mode}): physical={Physical}, target={Target}, symlink={UseSymlink}. {Reason}",
+            "Resolved {SyncMode} layout ({Mode}): physical={Physical}, target={Target}, symlink={UseSymlink}. {Reason}",
+            isDownloadMode ? "Download" : "Stream",
             resolution.DetectionMode,
             resolution.PhysicalStoragePath,
             resolution.TargetSeasonPath,
             resolution.UseSymlink,
             resolution.Reason);
 
-        var (writeDir, perFileSymlinkDir) = EnsureStorageLayout(resolution);
-
+        var (writeDir, perFileSymlinkDir) = RezeroStorageLinker.EnsureStorageLayout(resolution, _logger);
         progress?.Report(5);
 
-        // 1. Fetch metadata & check updates
         var arcsData = await _apiClient.GetArcsAsync(cancellationToken).ConfigureAwait(false);
         if (arcsData?.Arcs == null || arcsData.Arcs.Count == 0)
         {
             var msg = "No arcs retrieved from videos.json API";
             _logger.LogWarning(msg);
             config.LastSyncStatus = msg;
-            SaveConfig();
+            SaveConfig(isEphemeralRun);
             return 0;
         }
 
         var updatesData = await _apiClient.GetUpdatesAsync(cancellationToken).ConfigureAwait(false);
-        var latestUpdate = updatesData?.Updates?.FirstOrDefault();
-        if (latestUpdate != null)
+        if (updatesData?.Updates?.FirstOrDefault() is { } latestUpdate)
         {
             config.LastUpdateGuid = $"{latestUpdate.Date}_{latestUpdate.Title}";
         }
 
-        var totalArcs = arcsData.Arcs.Count;
-        var syncedEpisodesCount = 0;
-        var globalEpisodeIndex = 1;
+        var showTitle = isStandalone ? (config.StandaloneSeriesTitle ?? "Re:Zero - The Perfect Run") : "Re: ZERO, Starting Life in Another World";
+        var syncedCount = isDownloadMode
+            ? await SyncDownloadModeAsync(arcsData.Arcs, config, showTitle, writeDir, perFileSymlinkDir, progress, cancellationToken).ConfigureAwait(false)
+            : await SyncStreamModeAsync(arcsData.Arcs, config, showTitle, writeDir, perFileSymlinkDir, progress, cancellationToken).ConfigureAwait(false);
 
+        config.LastSyncUtc = DateTime.UtcNow;
+        config.TotalSyncedEpisodes = syncedCount;
+        config.LastSyncStatus = $"Successfully synchronized {syncedCount} {(isDownloadMode ? "downloaded" : "streaming")} episodes across {arcsData.Arcs.Count} arcs ({resolution.DetectionMode}).";
+        SaveConfig(isEphemeralRun);
+
+        _logger.LogInformation("Re:Zero sync completed ({Mode}). Synchronized {Count} episodes in {Path}", config.SyncMode, syncedCount, writeDir);
+
+        if (!isEphemeralRun && syncedCount > 0 && _libraryManager != null)
+        {
+            _logger.LogInformation("Triggering Jellyfin library scan...");
+            _libraryManager.QueueLibraryScan();
+        }
+
+        progress?.Report(100);
+        return syncedCount;
+    }
+
+    private async Task<int> SyncStreamModeAsync(
+        IReadOnlyList<ArcDto> arcs,
+        PluginConfiguration config,
+        string showTitle,
+        string writeDir,
+        string? perFileSymlinkDir,
+        IProgress<double>? progress,
+        CancellationToken cancellationToken)
+    {
+        var syncedCount = 0;
+        var globalEpisodeIndex = 1;
         var qualitiesToGenerate = config.EnableMultiVersionFiles
             ? new[] { "1080p", "720p", "480p" }
             : new[] { config.PreferredQuality };
 
-        var showTitle = isStandalone ? (config.StandaloneSeriesTitle ?? "Re:Zero - The Perfect Run") : "Re: ZERO, Starting Life in Another World";
-
-        // 2. Process Arcs and Episodes
-        for (var i = 0; i < totalArcs; i++)
+        for (var i = 0; i < arcs.Count; i++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-
-            var arc = arcsData.Arcs[i];
+            var arc = arcs[i];
             var arcEpisodes = await _apiClient.GetArcEpisodesAsync(arc.Id, cancellationToken).ConfigureAwait(false);
             if (arcEpisodes?.Episodes == null || arcEpisodes.Episodes.Count == 0)
             {
@@ -173,7 +209,6 @@ public class RezeroSyncService : IRezeroSyncService
             foreach (var episode in arcEpisodes.Episodes)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-
                 var languages = GetLanguagesToSync(config.PreferredLanguage);
                 var captionsList = GetCaptionsToSync(config.PreferredCaptions);
 
@@ -183,14 +218,7 @@ public class RezeroSyncService : IRezeroSyncService
                     {
                         foreach (var quality in qualitiesToGenerate)
                         {
-                            var streamUrl = _apiClient.ResolveStreamUrl(
-                                episode,
-                                arc,
-                                lang,
-                                cap,
-                                quality,
-                                config.StreamFormat);
-
+                            var streamUrl = _apiClient.ResolveStreamUrl(episode, arc, lang, cap, quality, config.StreamFormat);
                             if (string.IsNullOrWhiteSpace(streamUrl))
                             {
                                 continue;
@@ -201,25 +229,20 @@ public class RezeroSyncService : IRezeroSyncService
                             var epTitle = string.IsNullOrWhiteSpace(episode.Title) ? $"Episode {episode.Number}" : episode.Title;
                             var fileNameBase = $"Re ZERO Starting Life in Another World - S{config.SeasonNumber:D2}E{globalEpisodeIndex:D2} - [Arc {arc.Number:D2}] {SanitizeFileName(epTitle)}{variantSuffix}{qualitySuffix}";
 
-                            var strmFileName = $"{fileNameBase}.strm";
-                            var nfoFileName = $"{fileNameBase}.nfo";
-                            var strmFile = Path.Combine(writeDir, strmFileName);
-                            var nfoFile = Path.Combine(writeDir, nfoFileName);
+                            var strmFile = Path.Combine(writeDir, $"{fileNameBase}.strm");
+                            var nfoFile = Path.Combine(writeDir, $"{fileNameBase}.nfo");
 
-                            // Write .strm pointer
-                            await WriteIfChangedAsync(strmFile, streamUrl.Trim(), cancellationToken).ConfigureAwait(false);
-
-                            // Write .nfo metadata
-                            var nfoContent = BuildEpisodeNfo(arc, episode, globalEpisodeIndex, config.SeasonNumber, showTitle, epTitle, variantSuffix);
-                            await WriteIfChangedAsync(nfoFile, nfoContent, cancellationToken).ConfigureAwait(false);
+                            await RezeroStorageLinker.WriteIfChangedAsync(strmFile, streamUrl.Trim(), cancellationToken).ConfigureAwait(false);
+                            var nfoContent = RezeroStorageLinker.BuildEpisodeNfo(arc, episode, globalEpisodeIndex, config.SeasonNumber, showTitle, variantSuffix);
+                            await RezeroStorageLinker.WriteIfChangedAsync(nfoFile, nfoContent, cancellationToken).ConfigureAwait(false);
 
                             if (!string.IsNullOrWhiteSpace(perFileSymlinkDir))
                             {
-                                EnsureFileSymlink(Path.Combine(perFileSymlinkDir, strmFileName), strmFile);
-                                EnsureFileSymlink(Path.Combine(perFileSymlinkDir, nfoFileName), nfoFile);
+                                RezeroStorageLinker.EnsureFileSymlink(Path.Combine(perFileSymlinkDir, $"{fileNameBase}.strm"), strmFile, _logger);
+                                RezeroStorageLinker.EnsureFileSymlink(Path.Combine(perFileSymlinkDir, $"{fileNameBase}.nfo"), nfoFile, _logger);
                             }
 
-                            syncedEpisodesCount++;
+                            syncedCount++;
                         }
                     }
                 }
@@ -227,86 +250,181 @@ public class RezeroSyncService : IRezeroSyncService
                 globalEpisodeIndex++;
             }
 
-            var currentProgress = 5.0 + (((double)(i + 1) / totalArcs) * 90.0);
-            progress?.Report(currentProgress);
+            progress?.Report(5.0 + (((double)(i + 1) / arcs.Count) * 90.0));
         }
 
-        config.LastSyncUtc = DateTime.UtcNow;
-        config.TotalSyncedEpisodes = syncedEpisodesCount;
-        config.LastSyncStatus = $"Successfully synchronized {syncedEpisodesCount} streaming episodes across {totalArcs} arcs ({resolution.DetectionMode}).";
-        SaveConfig();
-
-        _logger.LogInformation("Re:Zero sync completed. Synchronized {Count} stream pointers to {Path}", syncedEpisodesCount, writeDir);
-
-        if (syncedEpisodesCount > 0 && _libraryManager != null)
-        {
-            _logger.LogInformation("Triggering Jellyfin library scan...");
-            _libraryManager.QueueLibraryScan();
-        }
-
-        progress?.Report(100);
-        return syncedEpisodesCount;
+        return syncedCount;
     }
 
-    /// <inheritdoc />
-    public string? ResolveSeriesPath()
+    private async Task<int> SyncDownloadModeAsync(
+        IReadOnlyList<ArcDto> arcs,
+        PluginConfiguration config,
+        string showTitle,
+        string writeDir,
+        string? perFileSymlinkDir,
+        IProgress<double>? progress,
+        CancellationToken cancellationToken)
     {
-        var config = _configOverride ?? Plugin.Instance?.Configuration;
+        var syncedCount = 0;
+        var newDownloadsCount = 0;
+        var globalEpisodeIndex = 1;
+        var capReached = false;
+
+        for (var i = 0; i < arcs.Count && !capReached; i++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var arc = arcs[i];
+            var arcEpisodes = await _apiClient.GetArcEpisodesAsync(arc.Id, cancellationToken).ConfigureAwait(false);
+            if (arcEpisodes?.Episodes == null || arcEpisodes.Episodes.Count == 0)
+            {
+                continue;
+            }
+
+            foreach (var episode in arcEpisodes.Episodes)
+            {
+                if (capReached)
+                {
+                    break;
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+                var languages = GetLanguagesToSync(config.PreferredLanguage);
+                var captionsList = GetCaptionsToSync(config.PreferredCaptions);
+
+                foreach (var lang in languages)
+                {
+                    if (capReached)
+                    {
+                        break;
+                    }
+
+                    foreach (var cap in captionsList)
+                    {
+                        if (config.MaxDownloadsPerRun > 0 && newDownloadsCount >= config.MaxDownloadsPerRun)
+                        {
+                            capReached = true;
+                            break;
+                        }
+
+                        var downloadUrl = _apiClient.ResolveDownloadUrl(episode, arc, lang, cap);
+                        if (string.IsNullOrWhiteSpace(downloadUrl))
+                        {
+                            continue;
+                        }
+
+                        var variantSuffix = BuildVariantSuffix(languages.Count > 1, captionsList.Count > 1, lang, cap);
+                        var epTitle = string.IsNullOrWhiteSpace(episode.Title) ? $"Episode {episode.Number}" : episode.Title;
+                        var fileNameBase = $"Re ZERO Starting Life in Another World - S{config.SeasonNumber:D2}E{globalEpisodeIndex:D2} - [Arc {arc.Number:D2}] {SanitizeFileName(epTitle)}{variantSuffix}";
+
+                        var mp4File = Path.Combine(writeDir, $"{fileNameBase}.mp4");
+                        var nfoFile = Path.Combine(writeDir, $"{fileNameBase}.nfo");
+
+                        var dlResult = await _downloadService.DownloadEpisodeAsync(downloadUrl, mp4File, config.SkipExistingDownloads, cancellationToken).ConfigureAwait(false);
+                        if (!dlResult.Succeeded)
+                        {
+                            _logger.LogWarning("Download skipped/failed for {File} ({Outcome}): {Error}", fileNameBase, dlResult.Outcome, dlResult.ErrorMessage);
+                            continue;
+                        }
+
+                        if (!dlResult.Skipped)
+                        {
+                            newDownloadsCount++;
+                            _logger.LogInformation("Downloaded 1080p MP4 ({Bytes} bytes): {File}", dlResult.BytesDownloaded, mp4File);
+                        }
+                        else
+                        {
+                            _logger.LogInformation("Skipped existing verified MP4: {File}", mp4File);
+                        }
+
+                        var nfoContent = RezeroStorageLinker.BuildEpisodeNfo(arc, episode, globalEpisodeIndex, config.SeasonNumber, showTitle, variantSuffix);
+                        await RezeroStorageLinker.WriteIfChangedAsync(nfoFile, nfoContent, cancellationToken).ConfigureAwait(false);
+
+                        if (config.CleanOppositeModeFiles)
+                        {
+                            RezeroStorageLinker.TryDeleteOppositeStrm(writeDir, perFileSymlinkDir, fileNameBase);
+                        }
+
+                        if (!string.IsNullOrWhiteSpace(perFileSymlinkDir))
+                        {
+                            RezeroStorageLinker.EnsureFileSymlink(Path.Combine(perFileSymlinkDir, $"{fileNameBase}.mp4"), mp4File, _logger);
+                            RezeroStorageLinker.EnsureFileSymlink(Path.Combine(perFileSymlinkDir, $"{fileNameBase}.nfo"), nfoFile, _logger);
+                        }
+
+                        syncedCount++;
+
+                        if (config.MaxDownloadsPerRun > 0 && newDownloadsCount >= config.MaxDownloadsPerRun)
+                        {
+                            capReached = true;
+                            break;
+                        }
+                    }
+                }
+
+                globalEpisodeIndex++;
+            }
+
+            progress?.Report(5.0 + (((double)(i + 1) / arcs.Count) * 90.0));
+        }
+
+        return syncedCount;
+    }
+
+    private string? ResolveSeriesPathInternal(PluginConfiguration? config, bool allowCreateExplicitTarget)
+    {
         if (config != null)
         {
-            // Custom path specified
-            if (!string.IsNullOrWhiteSpace(config.TargetSeriesPath) && Directory.Exists(config.TargetSeriesPath))
+            if (!string.IsNullOrWhiteSpace(config.TargetSeriesPath) &&
+                (allowCreateExplicitTarget ||
+                 string.Equals(config.MatchingStrategy, "CustomPath", StringComparison.OrdinalIgnoreCase) ||
+                 Directory.Exists(config.TargetSeriesPath)))
             {
                 return config.TargetSeriesPath;
             }
 
-            // Standalone series mode
-            if (string.Equals(config.IntegrationMode, "StandaloneSeries", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(config.IntegrationMode, "StandaloneSeries", StringComparison.OrdinalIgnoreCase) &&
+                !string.IsNullOrWhiteSpace(config.StandaloneLibraryPath) &&
+                (allowCreateExplicitTarget || Directory.Exists(config.StandaloneLibraryPath)))
             {
-                if (!string.IsNullOrWhiteSpace(config.StandaloneLibraryPath) && Directory.Exists(config.StandaloneLibraryPath))
-                {
-                    var seriesFolder = SanitizeFileName(config.StandaloneSeriesTitle ?? "Re:Zero - The Perfect Run");
-                    return Path.Combine(config.StandaloneLibraryPath, seriesFolder);
-                }
+                var seriesFolder = SanitizeFileName(config.StandaloneSeriesTitle ?? "Re:Zero - The Perfect Run");
+                return Path.Combine(config.StandaloneLibraryPath, seriesFolder);
             }
         }
 
-        // Try to find series in Jellyfin library virtual folders
         if (_libraryManager != null)
         {
             try
             {
                 foreach (var vf in _libraryManager.GetVirtualFolders())
                 {
-                    if (string.Equals(vf.CollectionType?.ToString(), "tvshows", StringComparison.OrdinalIgnoreCase) && vf.Locations != null)
+                    if (!string.Equals(vf.CollectionType?.ToString(), "tvshows", StringComparison.OrdinalIgnoreCase) || vf.Locations == null)
                     {
-                        foreach (var loc in vf.Locations)
+                        continue;
+                    }
+
+                    foreach (var loc in vf.Locations)
+                    {
+                        if (!Directory.Exists(loc))
                         {
-                            if (!Directory.Exists(loc))
-                            {
-                                continue;
-                            }
+                            continue;
+                        }
 
-                            // If standalone mode and library path not set, use first TV library root
-                            if (config != null && string.Equals(config.IntegrationMode, "StandaloneSeries", StringComparison.OrdinalIgnoreCase))
-                            {
-                                var seriesFolder = SanitizeFileName(config.StandaloneSeriesTitle ?? "Re:Zero - The Perfect Run");
-                                return Path.Combine(loc, seriesFolder);
-                            }
+                        if (config != null && string.Equals(config.IntegrationMode, "StandaloneSeries", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var seriesFolder = SanitizeFileName(config.StandaloneSeriesTitle ?? "Re:Zero - The Perfect Run");
+                            return Path.Combine(loc, seriesFolder);
+                        }
 
-                            // Match existing series folder
-                            var matchedDir = Directory.EnumerateDirectories(loc)
-                                .FirstOrDefault(d =>
-                                {
-                                    var name = Path.GetFileName(d);
-                                    return name.Contains("Re:Zero", StringComparison.OrdinalIgnoreCase) ||
-                                           name.Contains("Re - ZERO", StringComparison.OrdinalIgnoreCase);
-                                });
-
-                            if (matchedDir != null)
+                        var matchedDir = Directory.EnumerateDirectories(loc)
+                            .FirstOrDefault(d =>
                             {
-                                return matchedDir;
-                            }
+                                var name = Path.GetFileName(d);
+                                return name.Contains("Re:Zero", StringComparison.OrdinalIgnoreCase) ||
+                                       name.Contains("Re - ZERO", StringComparison.OrdinalIgnoreCase);
+                            });
+
+                        if (matchedDir != null)
+                        {
+                            return matchedDir;
                         }
                     }
                 }
@@ -317,7 +435,6 @@ public class RezeroSyncService : IRezeroSyncService
             }
         }
 
-        // Fallback known Docker/Linux mount locations
         string[] candidates =
         [
             "/data/tv/Re - ZERO, Starting Life in Another World",
@@ -326,36 +443,30 @@ public class RezeroSyncService : IRezeroSyncService
             "/opt/docker/data/media/local/tv/Re - ZERO, Starting Life in Another World"
         ];
 
-        foreach (var path in candidates)
+        return candidates.FirstOrDefault(Directory.Exists);
+    }
+
+    private void SaveConfig(bool isEphemeralRun)
+    {
+        if (!isEphemeralRun)
         {
-            if (Directory.Exists(path))
-            {
-                return path;
-            }
+            Plugin.Instance?.SaveConfiguration();
         }
-
-        return null;
     }
 
-    private static List<string> GetLanguagesToSync(string preferredLanguage)
+    private static List<string> GetLanguagesToSync(string preferredLanguage) => preferredLanguage.ToLowerInvariant() switch
     {
-        return preferredLanguage.ToLowerInvariant() switch
-        {
-            "both" => new List<string> { "jp", "en" },
-            "en" => new List<string> { "en" },
-            _ => new List<string> { "jp" }
-        };
-    }
+        "both" => new List<string> { "jp", "en" },
+        "en" => new List<string> { "en" },
+        _ => new List<string> { "jp" }
+    };
 
-    private static List<string> GetCaptionsToSync(string preferredCaptions)
+    private static List<string> GetCaptionsToSync(string preferredCaptions) => preferredCaptions.ToLowerInvariant() switch
     {
-        return preferredCaptions.ToLowerInvariant() switch
-        {
-            "both" => new List<string> { "cc", "off" },
-            "off" => new List<string> { "off" },
-            _ => new List<string> { "cc" }
-        };
-    }
+        "both" => new List<string> { "cc", "off" },
+        "off" => new List<string> { "off" },
+        _ => new List<string> { "cc" }
+    };
 
     private static string BuildVariantSuffix(bool multiLang, bool multiCaptions, string lang, string cap)
     {
@@ -387,204 +498,5 @@ public class RezeroSyncService : IRezeroSyncService
         }
 
         return sb.ToString().Trim();
-    }
-
-    private static string BuildEpisodeNfo(
-        ArcDto arc,
-        EpisodeDto episode,
-        int globalEpisodeIndex,
-        int seasonNumber,
-        string showTitle,
-        string epTitle,
-        string variantSuffix)
-    {
-        var doc = new XDocument(
-            new XDeclaration("1.0", "utf-8", "yes"),
-            new XElement("episodedetails",
-                new XElement("title", $"[The Perfect Run] Arc {arc.Number:D2}: {arc.Title} - Episode {episode.Number}{variantSuffix}"),
-                new XElement("showtitle", showTitle),
-                new XElement("season", seasonNumber),
-                new XElement("episode", globalEpisodeIndex),
-                new XElement("plot", arc.Description),
-                new XElement("thumb", $"https://rezeroperfect.run{arc.Artwork}"),
-                episode.Segments?.Intro != null ? new XElement("intro",
-                    new XElement("start", episode.Segments.Intro.Start),
-                    new XElement("end", episode.Segments.Intro.End)) : null,
-                episode.Segments?.Outro != null ? new XElement("outro",
-                    new XElement("start", episode.Segments.Outro.Start),
-                    new XElement("end", episode.Segments.Outro.End)) : null
-            )
-        );
-
-        return doc.ToString();
-    }
-
-    private static string BuildTvShowNfo(string title)
-    {
-        var doc = new XDocument(
-            new XDeclaration("1.0", "utf-8", "yes"),
-            new XElement("tvshow",
-                new XElement("title", title),
-                new XElement("originaltitle", "Re:ゼロから始める異世界生活 - The Perfect Run"),
-                new XElement("plot", "Experience the world of Re:Zero through the lens of those around Subaru without deaths or loops. To those who never see his failures, just how much of an enigma must he seem?"),
-                new XElement("genre", "Animation"),
-                new XElement("genre", "Anime"),
-                new XElement("genre", "Fantasy"),
-                new XElement("studio", "White Fox"),
-                new XElement("year", "2026")
-            )
-        );
-
-        return doc.ToString();
-    }
-
-    private static async Task WriteIfChangedAsync(string filePath, string newContent, CancellationToken cancellationToken)
-    {
-        if (File.Exists(filePath))
-        {
-            var existing = await File.ReadAllTextAsync(filePath, cancellationToken).ConfigureAwait(false);
-            if (string.Equals(existing.Trim(), newContent.Trim(), StringComparison.Ordinal))
-            {
-                return;
-            }
-        }
-
-        await File.WriteAllTextAsync(filePath, newContent, Encoding.UTF8, cancellationToken).ConfigureAwait(false);
-    }
-
-    private void SaveConfig()
-    {
-        if (_configOverride == null)
-        {
-            Plugin.Instance?.SaveConfiguration();
-        }
-    }
-
-    private (string WriteDir, string? PerFileSymlinkDir) EnsureStorageLayout(StorageResolutionResult resolution)
-    {
-        var physicalDir = resolution.PhysicalStoragePath;
-        var targetSeasonDir = resolution.TargetSeasonPath;
-
-        Directory.CreateDirectory(physicalDir);
-
-        if (!resolution.UseSymlink || StoragePathResolver.IsSameOrNestedPath(targetSeasonDir, physicalDir))
-        {
-            return (physicalDir, null);
-        }
-
-        try
-        {
-            var targetInfo = new DirectoryInfo(targetSeasonDir);
-            var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
-            if (targetInfo.LinkTarget != null)
-            {
-                var targetParent = Path.GetDirectoryName(targetSeasonDir) ?? Path.GetPathRoot(targetSeasonDir) ?? string.Empty;
-                var resolvedExisting = Path.TrimEndingDirectorySeparator(Path.GetFullPath(targetInfo.LinkTarget, targetParent));
-                var normalizedPhysical = Path.TrimEndingDirectorySeparator(Path.GetFullPath(physicalDir));
-                if (string.Equals(resolvedExisting, normalizedPhysical, comparison))
-                {
-                    return (physicalDir, null);
-                }
-
-                Directory.Delete(targetSeasonDir, recursive: false);
-                Directory.CreateSymbolicLink(targetSeasonDir, physicalDir);
-                _logger.LogInformation("Updated directory symlink {Target} -> {Physical}", targetSeasonDir, physicalDir);
-                return (physicalDir, null);
-            }
-
-            if (!Directory.Exists(targetSeasonDir) && !File.Exists(targetSeasonDir))
-            {
-                Directory.CreateSymbolicLink(targetSeasonDir, physicalDir);
-                _logger.LogInformation("Created directory symlink {Target} -> {Physical}", targetSeasonDir, physicalDir);
-                return (physicalDir, null);
-            }
-
-            if (Directory.Exists(targetSeasonDir))
-            {
-                var entries = Directory.EnumerateFileSystemEntries(targetSeasonDir).ToList();
-                if (entries.Count == 0)
-                {
-                    Directory.Delete(targetSeasonDir, recursive: false);
-                    Directory.CreateSymbolicLink(targetSeasonDir, physicalDir);
-                    _logger.LogInformation("Replaced empty directory with symlink {Target} -> {Physical}", targetSeasonDir, physicalDir);
-                    return (physicalDir, null);
-                }
-
-                if (entries.All(e => !Directory.Exists(e) && IsGeneratedRezeroFile(e)))
-                {
-                    foreach (var entry in entries)
-                    {
-                        File.Delete(entry);
-                    }
-
-                    Directory.Delete(targetSeasonDir, recursive: false);
-                    Directory.CreateSymbolicLink(targetSeasonDir, physicalDir);
-                    _logger.LogInformation("Migrated existing Re:Zero stream folder to symlink {Target} -> {Physical}", targetSeasonDir, physicalDir);
-                    return (physicalDir, null);
-                }
-
-                _logger.LogInformation(
-                    "Existing files preserved in {Target}; linking Re:Zero files individually from {Physical}",
-                    targetSeasonDir,
-                    physicalDir);
-                return (physicalDir, targetSeasonDir);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Could not create symlink {Target} -> {Physical}; falling back to direct writes.", targetSeasonDir, physicalDir);
-        }
-
-        Directory.CreateDirectory(targetSeasonDir);
-        return (targetSeasonDir, null);
-    }
-
-    private void EnsureFileSymlink(string linkPath, string targetFilePath)
-    {
-        try
-        {
-            var fileInfo = new FileInfo(linkPath);
-            var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
-            if (fileInfo.LinkTarget != null)
-            {
-                var linkDir = Path.GetDirectoryName(linkPath) ?? string.Empty;
-                var resolvedExisting = Path.GetFullPath(fileInfo.LinkTarget, linkDir);
-                if (string.Equals(resolvedExisting, Path.GetFullPath(targetFilePath), comparison))
-                {
-                    return;
-                }
-
-                File.Delete(linkPath);
-            }
-            else if (File.Exists(linkPath))
-            {
-                if (!IsGeneratedRezeroFile(linkPath))
-                {
-                    return;
-                }
-
-                File.Delete(linkPath);
-            }
-
-            File.CreateSymbolicLink(linkPath, targetFilePath);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to create per-file symlink {Link} -> {Target}", linkPath, targetFilePath);
-        }
-    }
-
-    private static bool IsGeneratedRezeroFile(string filePath)
-    {
-        var ext = Path.GetExtension(filePath);
-        if (!ext.Equals(".strm", StringComparison.OrdinalIgnoreCase) &&
-            !ext.Equals(".nfo", StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        var name = Path.GetFileName(filePath);
-        return name.StartsWith("Re ZERO Starting Life in Another World - S", StringComparison.OrdinalIgnoreCase) ||
-               name.Contains("[Arc ", StringComparison.OrdinalIgnoreCase);
     }
 }

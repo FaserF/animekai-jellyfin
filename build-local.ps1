@@ -16,8 +16,8 @@ if (Get-Command dotnet -ErrorAction SilentlyContinue) {
         dotnet run --project Jellyfin.Plugin.Rezero.Tests -c Release --no-build
         if ($LASTEXITCODE -eq 0) {
             Write-Host "Local build & tests completed successfully!" -ForegroundColor Green
-            exit 0
         }
+        exit $LASTEXITCODE
     }
 }
 
