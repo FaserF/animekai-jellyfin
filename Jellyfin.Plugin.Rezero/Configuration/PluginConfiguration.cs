@@ -44,6 +44,20 @@ public class PluginConfiguration : BasePluginConfiguration
     public string SeasonFolder { get; set; } = "Season 00";
 
     /// <summary>
+    /// Gets or sets an optional manual dedicated storage path where .strm and .nfo files are physically stored
+    /// (e.g. /data/rezero/Season 00 on fast local SSD). Leave blank (default) to enable dynamic auto-detection
+    /// of a fast local folder outside any union/mergerfs/rclone cloud mount or library root.
+    /// </summary>
+    public string DedicatedStoragePath { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the plugin should store physical files in a dedicated local
+    /// directory (resolved dynamically or via <see cref="DedicatedStoragePath"/>) and expose them into the
+    /// series folder via symbolic link (recommended for cloud/mergerfs setups).
+    /// </summary>
+    public bool EnableSymlink { get; set; } = true;
+
+    /// <summary>
     /// Gets or sets a value indicating whether all available video qualities (1080p, 720p, 480p)
     /// should dynamically be offered in Jellyfin client players via IMediaSourceProvider.
     /// </summary>

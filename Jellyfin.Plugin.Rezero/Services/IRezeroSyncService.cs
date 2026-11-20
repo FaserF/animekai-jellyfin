@@ -21,4 +21,9 @@ public interface IRezeroSyncService
     /// Resolves the file system path for the target Re:Zero series directory.
     /// </summary>
     string? ResolveSeriesPath();
+
+    /// <summary>
+    /// Resolves the physical local storage path and target symlink path for the current environment.
+    /// </summary>
+    StorageResolutionResult? ResolveStoragePaths();
 }

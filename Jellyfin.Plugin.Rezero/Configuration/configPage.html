@@ -5,7 +5,7 @@
     <title>Re:Zero Perfect Run</title>
 </head>
 <body>
-    <div id="RezeroConfigurationPage" data-role="page" class="page type-interior pluginConfigurationPage" data-controller="__plugin/RezeroConfigurationPage.js">
+    <div id="RezeroConfigurationPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select,emby-checkbox">
         <div data-role="content">
             <div class="content-primary">
                 <form id="rezeroConfigForm">
@@ -49,6 +49,23 @@
                             <label class="inputLabel inputLabelUnfocused" for="txtSeasonNumber">Season Number</label>
                             <input is="emby-input" type="number" id="txtSeasonNumber" name="SeasonNumber" class="emby-input" value="0" />
                             <div class="fieldDescription">Season index in metadata (0 = Specials).</div>
+                        </div>
+                    </div>
+
+                    <div class="verticalSection">
+                        <h2>Storage &amp; Efficiency (Dedicated Folder &amp; Symlink)</h2>
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input is="emby-checkbox" type="checkbox" id="chkEnableSymlink" name="EnableSymlink" checked />
+                                <span>Use Dedicated Local Storage Folder with Symlink (Recommended)</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">Automatically stores tiny .strm/.nfo files on fast local disk (avoiding rclone/mergerfs cloud mount overhead) and exposes them via symlink into the series folder.</div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="txtDedicatedStoragePath">Custom Dedicated Storage Path (Optional)</label>
+                            <input is="emby-input" type="text" id="txtDedicatedStoragePath" name="DedicatedStoragePath" class="emby-input" placeholder="Auto-detected dynamically (e.g. /data/rezero/Season 00)" />
+                            <div class="fieldDescription">Leave blank to dynamically detect a local root outside cloud/union mounts (or fallback to AppData). Set a path to override manually.</div>
                         </div>
                     </div>
 
@@ -176,6 +193,8 @@
                     page.querySelector("#txtStandaloneLibraryPath").value = config.StandaloneLibraryPath || "";
                     page.querySelector("#txtSeasonFolder").value = config.SeasonFolder || "Season 00";
                     page.querySelector("#txtSeasonNumber").value = config.SeasonNumber !== undefined ? config.SeasonNumber : 0;
+                    page.querySelector("#chkEnableSymlink").checked = config.EnableSymlink !== false;
+                    page.querySelector("#txtDedicatedStoragePath").value = config.DedicatedStoragePath || "";
                     page.querySelector("#chkOfferAllQualitiesInPlayer").checked = config.OfferAllQualitiesInPlayer !== false;
                     page.querySelector("#chkEnableMultiVersionFiles").checked = config.EnableMultiVersionFiles === true;
                     page.querySelector("#chkEnableAutoSync").checked = config.EnableAutoSync !== false;
@@ -192,10 +211,20 @@
 
                 ApiClient.getJSON(ApiClient.getUrl("Rezero/Status")).then(function (status) {
                     var statusEl = page.querySelector("#lblSyncStatus");
-                    var lastSync = status.lastSyncUtc ? new Date(status.lastSyncUtc).toLocaleString() : "Never";
-                    statusEl.innerHTML = "<strong>Status:</strong> " + (status.lastSyncStatus || "Idle") +
-                        "<br><strong>Episodes Synced:</strong> " + (status.totalSyncedEpisodes || 0) +
-                        "<br><strong>Series Path:</strong> " + (status.seriesPath || "Auto-detecting...") +
+                    var lastSyncUtc = status.lastSyncUtc || status.LastSyncUtc;
+                    var lastSync = lastSyncUtc ? new Date(lastSyncUtc).toLocaleString() : "Never";
+                    var syncStatus = status.lastSyncStatus || status.LastSyncStatus || "Idle";
+                    var totalEpisodes = status.totalSyncedEpisodes !== undefined ? status.totalSyncedEpisodes : (status.TotalSyncedEpisodes || 0);
+                    var seriesPath = status.seriesPath || status.SeriesPath || "Auto-detecting...";
+                    var resolvedStorage = status.resolvedStoragePath || status.ResolvedStoragePath || "Auto-detecting...";
+                    var detectionMode = status.storageDetectionMode || status.StorageDetectionMode || "Auto";
+                    var useSymlink = status.useSymlink !== undefined ? status.useSymlink : status.UseSymlink;
+                    var symlinkActive = status.isSymlinkActive !== undefined ? status.isSymlinkActive : status.IsSymlinkActive;
+                    var symlinkText = useSymlink ? (symlinkActive ? "Active Symlink" : "Symlink Pending Sync") : "Direct Write";
+                    statusEl.innerHTML = "<strong>Status:</strong> " + syncStatus +
+                        "<br><strong>Episodes Synced:</strong> " + totalEpisodes +
+                        "<br><strong>Series Path:</strong> " + seriesPath +
+                        "<br><strong>Physical Storage:</strong> " + resolvedStorage + " (" + detectionMode + " &bull; " + symlinkText + ")" +
                         "<br><strong>Last Sync:</strong> " + lastSync;
                 }).catch(function() {});
 
@@ -224,6 +253,11 @@
                 var page = this;
                 loadConfig(page);
 
+                if (page._rezeroBound) {
+                    return;
+                }
+                page._rezeroBound = true;
+
                 page.querySelector("#selectIntegrationMode").addEventListener("change", function () {
                     updateModeVisibility(this.value);
                 });
@@ -237,6 +271,8 @@
                         config.StandaloneLibraryPath = page.querySelector("#txtStandaloneLibraryPath").value;
                         config.SeasonFolder = page.querySelector("#txtSeasonFolder").value;
                         config.SeasonNumber = parseInt(page.querySelector("#txtSeasonNumber").value, 10) || 0;
+                        config.EnableSymlink = page.querySelector("#chkEnableSymlink").checked;
+                        config.DedicatedStoragePath = page.querySelector("#txtDedicatedStoragePath").value;
                         config.OfferAllQualitiesInPlayer = page.querySelector("#chkOfferAllQualitiesInPlayer").checked;
                         config.EnableMultiVersionFiles = page.querySelector("#chkEnableMultiVersionFiles").checked;
                         config.EnableAutoSync = page.querySelector("#chkEnableAutoSync").checked;

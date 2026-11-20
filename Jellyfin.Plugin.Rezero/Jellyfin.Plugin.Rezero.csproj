@@ -58,4 +58,8 @@
     <EmbeddedResource Include="thumb.png" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Jellyfin.Plugin.Rezero.Tests" />
+  </ItemGroup>
+
 </Project>

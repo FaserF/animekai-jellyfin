@@ -7,7 +7,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 using Jellyfin.Plugin.Rezero.Api;
+using Jellyfin.Plugin.Rezero.Configuration;
 using Jellyfin.Plugin.Rezero.Models;
+using MediaBrowser.Common.Configuration;
 using MediaBrowser.Controller.Library;
 using Microsoft.Extensions.Logging;
 
@@ -23,7 +25,10 @@ public class RezeroSyncService : IRezeroSyncService
 
     private readonly IRezeroApiClient _apiClient;
     private readonly ILibraryManager? _libraryManager;
+    private readonly IApplicationPaths? _applicationPaths;
     private readonly ILogger<RezeroSyncService> _logger;
+    private readonly StoragePathResolver _storagePathResolver;
+    private readonly PluginConfiguration? _configOverride;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="RezeroSyncService"/> class.
@@ -31,17 +36,51 @@ public class RezeroSyncService : IRezeroSyncService
     public RezeroSyncService(
         IRezeroApiClient apiClient,
         ILogger<RezeroSyncService> logger,
-        ILibraryManager? libraryManager = null)
+        ILibraryManager? libraryManager = null,
+        IApplicationPaths? applicationPaths = null)
+        : this(apiClient, logger, libraryManager, applicationPaths, null, null)
+    {
+    }
+
+    internal RezeroSyncService(
+        IRezeroApiClient apiClient,
+        ILogger<RezeroSyncService> logger,
+        ILibraryManager? libraryManager,
+        IApplicationPaths? applicationPaths,
+        StoragePathResolver? storagePathResolver,
+        PluginConfiguration? configOverride)
     {
         _apiClient = apiClient;
         _logger = logger;
         _libraryManager = libraryManager;
+        _applicationPaths = applicationPaths;
+        _storagePathResolver = storagePathResolver ?? new StoragePathResolver();
+        _configOverride = configOverride;
+    }
+
+    /// <inheritdoc />
+    public StorageResolutionResult? ResolveStoragePaths()
+    {
+        var config = _configOverride ?? Plugin.Instance?.Configuration;
+        if (config == null)
+        {
+            return null;
+        }
+
+        var seriesPath = ResolveSeriesPath();
+        if (string.IsNullOrWhiteSpace(seriesPath))
+        {
+            return null;
+        }
+
+        var seasonFolder = string.IsNullOrWhiteSpace(config.SeasonFolder) ? "Season 00" : config.SeasonFolder;
+        return _storagePathResolver.Resolve(config, seriesPath, seasonFolder, _applicationPaths?.DataPath);
     }
 
     /// <inheritdoc />
     public async Task<int> SyncEpisodesAsync(CancellationToken cancellationToken = default, IProgress<double>? progress = null)
     {
-        var config = Plugin.Instance?.Configuration;
+        var config = _configOverride ?? Plugin.Instance?.Configuration;
         if (config == null)
         {
             _logger.LogError("Re:Zero plugin configuration is not loaded");
@@ -54,7 +93,7 @@ public class RezeroSyncService : IRezeroSyncService
             var msg = "Target series path could not be resolved. Configure TargetSeriesPath or StandaloneLibraryPath in settings.";
             _logger.LogWarning(msg);
             config.LastSyncStatus = msg;
-            Plugin.Instance?.SaveConfiguration();
+            SaveConfig();
             return 0;
         }
 
@@ -78,12 +117,16 @@ public class RezeroSyncService : IRezeroSyncService
         }
 
         var seasonFolder = string.IsNullOrWhiteSpace(config.SeasonFolder) ? "Season 00" : config.SeasonFolder;
-        var targetSeasonDir = Path.Combine(seriesPath, seasonFolder);
-        if (!Directory.Exists(targetSeasonDir))
-        {
-            Directory.CreateDirectory(targetSeasonDir);
-            _logger.LogInformation("Created season directory: {Path}", targetSeasonDir);
-        }
+        var resolution = _storagePathResolver.Resolve(config, seriesPath, seasonFolder, _applicationPaths?.DataPath);
+        _logger.LogInformation(
+            "Resolved storage layout ({Mode}): physical={Physical}, target={Target}, symlink={UseSymlink}. {Reason}",
+            resolution.DetectionMode,
+            resolution.PhysicalStoragePath,
+            resolution.TargetSeasonPath,
+            resolution.UseSymlink,
+            resolution.Reason);
+
+        var (writeDir, perFileSymlinkDir) = EnsureStorageLayout(resolution);
 
         progress?.Report(5);
 
@@ -94,7 +137,7 @@ public class RezeroSyncService : IRezeroSyncService
             var msg = "No arcs retrieved from videos.json API";
             _logger.LogWarning(msg);
             config.LastSyncStatus = msg;
-            Plugin.Instance?.SaveConfiguration();
+            SaveConfig();
             return 0;
         }
 
@@ -158,8 +201,10 @@ public class RezeroSyncService : IRezeroSyncService
                             var epTitle = string.IsNullOrWhiteSpace(episode.Title) ? $"Episode {episode.Number}" : episode.Title;
                             var fileNameBase = $"Re ZERO Starting Life in Another World - S{config.SeasonNumber:D2}E{globalEpisodeIndex:D2} - [Arc {arc.Number:D2}] {SanitizeFileName(epTitle)}{variantSuffix}{qualitySuffix}";
 
-                            var strmFile = Path.Combine(targetSeasonDir, $"{fileNameBase}.strm");
-                            var nfoFile = Path.Combine(targetSeasonDir, $"{fileNameBase}.nfo");
+                            var strmFileName = $"{fileNameBase}.strm";
+                            var nfoFileName = $"{fileNameBase}.nfo";
+                            var strmFile = Path.Combine(writeDir, strmFileName);
+                            var nfoFile = Path.Combine(writeDir, nfoFileName);
 
                             // Write .strm pointer
                             await WriteIfChangedAsync(strmFile, streamUrl.Trim(), cancellationToken).ConfigureAwait(false);
@@ -167,6 +212,12 @@ public class RezeroSyncService : IRezeroSyncService
                             // Write .nfo metadata
                             var nfoContent = BuildEpisodeNfo(arc, episode, globalEpisodeIndex, config.SeasonNumber, showTitle, epTitle, variantSuffix);
                             await WriteIfChangedAsync(nfoFile, nfoContent, cancellationToken).ConfigureAwait(false);
+
+                            if (!string.IsNullOrWhiteSpace(perFileSymlinkDir))
+                            {
+                                EnsureFileSymlink(Path.Combine(perFileSymlinkDir, strmFileName), strmFile);
+                                EnsureFileSymlink(Path.Combine(perFileSymlinkDir, nfoFileName), nfoFile);
+                            }
 
                             syncedEpisodesCount++;
                         }
@@ -182,10 +233,10 @@ public class RezeroSyncService : IRezeroSyncService
 
         config.LastSyncUtc = DateTime.UtcNow;
         config.TotalSyncedEpisodes = syncedEpisodesCount;
-        config.LastSyncStatus = $"Successfully synchronized {syncedEpisodesCount} streaming episodes across {totalArcs} arcs.";
-        Plugin.Instance?.SaveConfiguration();
+        config.LastSyncStatus = $"Successfully synchronized {syncedEpisodesCount} streaming episodes across {totalArcs} arcs ({resolution.DetectionMode}).";
+        SaveConfig();
 
-        _logger.LogInformation("Re:Zero sync completed. Synchronized {Count} stream pointers to {Path}", syncedEpisodesCount, targetSeasonDir);
+        _logger.LogInformation("Re:Zero sync completed. Synchronized {Count} stream pointers to {Path}", syncedEpisodesCount, writeDir);
 
         if (syncedEpisodesCount > 0 && _libraryManager != null)
         {
@@ -200,7 +251,7 @@ public class RezeroSyncService : IRezeroSyncService
     /// <inheritdoc />
     public string? ResolveSeriesPath()
     {
-        var config = Plugin.Instance?.Configuration;
+        var config = _configOverride ?? Plugin.Instance?.Configuration;
         if (config != null)
         {
             // Custom path specified
@@ -399,5 +450,141 @@ public class RezeroSyncService : IRezeroSyncService
         }
 
         await File.WriteAllTextAsync(filePath, newContent, Encoding.UTF8, cancellationToken).ConfigureAwait(false);
+    }
+
+    private void SaveConfig()
+    {
+        if (_configOverride == null)
+        {
+            Plugin.Instance?.SaveConfiguration();
+        }
+    }
+
+    private (string WriteDir, string? PerFileSymlinkDir) EnsureStorageLayout(StorageResolutionResult resolution)
+    {
+        var physicalDir = resolution.PhysicalStoragePath;
+        var targetSeasonDir = resolution.TargetSeasonPath;
+
+        Directory.CreateDirectory(physicalDir);
+
+        if (!resolution.UseSymlink || StoragePathResolver.IsSameOrNestedPath(targetSeasonDir, physicalDir))
+        {
+            return (physicalDir, null);
+        }
+
+        try
+        {
+            var targetInfo = new DirectoryInfo(targetSeasonDir);
+            var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+            if (targetInfo.LinkTarget != null)
+            {
+                var targetParent = Path.GetDirectoryName(targetSeasonDir) ?? Path.GetPathRoot(targetSeasonDir) ?? string.Empty;
+                var resolvedExisting = Path.TrimEndingDirectorySeparator(Path.GetFullPath(targetInfo.LinkTarget, targetParent));
+                var normalizedPhysical = Path.TrimEndingDirectorySeparator(Path.GetFullPath(physicalDir));
+                if (string.Equals(resolvedExisting, normalizedPhysical, comparison))
+                {
+                    return (physicalDir, null);
+                }
+
+                Directory.Delete(targetSeasonDir, recursive: false);
+                Directory.CreateSymbolicLink(targetSeasonDir, physicalDir);
+                _logger.LogInformation("Updated directory symlink {Target} -> {Physical}", targetSeasonDir, physicalDir);
+                return (physicalDir, null);
+            }
+
+            if (!Directory.Exists(targetSeasonDir) && !File.Exists(targetSeasonDir))
+            {
+                Directory.CreateSymbolicLink(targetSeasonDir, physicalDir);
+                _logger.LogInformation("Created directory symlink {Target} -> {Physical}", targetSeasonDir, physicalDir);
+                return (physicalDir, null);
+            }
+
+            if (Directory.Exists(targetSeasonDir))
+            {
+                var entries = Directory.EnumerateFileSystemEntries(targetSeasonDir).ToList();
+                if (entries.Count == 0)
+                {
+                    Directory.Delete(targetSeasonDir, recursive: false);
+                    Directory.CreateSymbolicLink(targetSeasonDir, physicalDir);
+                    _logger.LogInformation("Replaced empty directory with symlink {Target} -> {Physical}", targetSeasonDir, physicalDir);
+                    return (physicalDir, null);
+                }
+
+                if (entries.All(e => !Directory.Exists(e) && IsGeneratedRezeroFile(e)))
+                {
+                    foreach (var entry in entries)
+                    {
+                        File.Delete(entry);
+                    }
+
+                    Directory.Delete(targetSeasonDir, recursive: false);
+                    Directory.CreateSymbolicLink(targetSeasonDir, physicalDir);
+                    _logger.LogInformation("Migrated existing Re:Zero stream folder to symlink {Target} -> {Physical}", targetSeasonDir, physicalDir);
+                    return (physicalDir, null);
+                }
+
+                _logger.LogInformation(
+                    "Existing files preserved in {Target}; linking Re:Zero files individually from {Physical}",
+                    targetSeasonDir,
+                    physicalDir);
+                return (physicalDir, targetSeasonDir);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not create symlink {Target} -> {Physical}; falling back to direct writes.", targetSeasonDir, physicalDir);
+        }
+
+        Directory.CreateDirectory(targetSeasonDir);
+        return (targetSeasonDir, null);
+    }
+
+    private void EnsureFileSymlink(string linkPath, string targetFilePath)
+    {
+        try
+        {
+            var fileInfo = new FileInfo(linkPath);
+            var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+            if (fileInfo.LinkTarget != null)
+            {
+                var linkDir = Path.GetDirectoryName(linkPath) ?? string.Empty;
+                var resolvedExisting = Path.GetFullPath(fileInfo.LinkTarget, linkDir);
+                if (string.Equals(resolvedExisting, Path.GetFullPath(targetFilePath), comparison))
+                {
+                    return;
+                }
+
+                File.Delete(linkPath);
+            }
+            else if (File.Exists(linkPath))
+            {
+                if (!IsGeneratedRezeroFile(linkPath))
+                {
+                    return;
+                }
+
+                File.Delete(linkPath);
+            }
+
+            File.CreateSymbolicLink(linkPath, targetFilePath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to create per-file symlink {Link} -> {Target}", linkPath, targetFilePath);
+        }
+    }
+
+    private static bool IsGeneratedRezeroFile(string filePath)
+    {
+        var ext = Path.GetExtension(filePath);
+        if (!ext.Equals(".strm", StringComparison.OrdinalIgnoreCase) &&
+            !ext.Equals(".nfo", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var name = Path.GetFileName(filePath);
+        return name.StartsWith("Re ZERO Starting Life in Another World - S", StringComparison.OrdinalIgnoreCase) ||
+               name.Contains("[Arc ", StringComparison.OrdinalIgnoreCase);
     }
 }

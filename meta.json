@@ -1,8 +1,18 @@
 {
+  "category": "Live TV & Streaming",
+  "changelog": "- Dynamic local dedicated storage auto-detection with symbolic link management (mergerfs/rclone/local aware)\n- Dynamic IMediaSourceProvider multi-quality selection (1080p, 720p, 480p)\n- Automated background synchronization via rezeroperfect.run JSON endpoints\n- Rich XML .nfo metadata with Intro/Outro segment markers",
+  "description": "Seamlessly integrates Re:Zero - The Perfect Run into Jellyfin as an official-grade Special Season with zero local video storage overhead via dynamic .strm and .nfo streaming synchronization.",
   "guid": "aaf63d7c-95e2-4cda-a6fc-7fbea2b90f8a",
   "name": "Re:Zero Perfect Run",
-  "description": "Seamlessly integrates Re:Zero - The Perfect Run into Jellyfin as an official-grade Special Season with zero local storage overhead via dynamic .strm and .nfo streaming synchronization.",
   "overview": "Dynamic HLS & direct MP4 streaming bridge and automated episode updater for Re:Zero Perfect Run.",
   "owner": "FaserF",
-  "category": "Live TV & Streaming"
+  "targetAbi": "12.0.0.0",
+  "timestamp": "2026-11-20T18:00:00.0000000Z",
+  "version": "1.0.0.0",
+  "status": "Active",
+  "autoUpdate": false,
+  "imagePath": "thumb.png",
+  "assemblies": [
+    "Jellyfin.Plugin.Rezero.dll"
+  ]
 }

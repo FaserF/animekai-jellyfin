@@ -13,9 +13,9 @@ namespace Jellyfin.Plugin.Rezero.Api;
 /// </summary>
 public class RezeroApiClient : IRezeroApiClient
 {
-    private const string SiteBaseUrl = "https://rezeroperfect.run/";
-    private const string HlsBaseUrl = "https://media.rezeroperfect.run/HLS/";
-    private const string DownloadsBaseUrl = "https://media.rezeroperfect.run/downloads/";
+    private const string DefaultSiteBaseUrl = "https://rezeroperfect.run/";
+    private const string DefaultHlsBaseUrl = "https://media.rezeroperfect.run/HLS/";
+    private const string DefaultDownloadsBaseUrl = "https://media.rezeroperfect.run/downloads/";
 
     private readonly HttpClient _httpClient;
     private readonly ILogger<RezeroApiClient> _logger;
@@ -35,7 +35,8 @@ public class RezeroApiClient : IRezeroApiClient
 
         if (_httpClient.BaseAddress == null)
         {
-            _httpClient.BaseAddress = new Uri(SiteBaseUrl);
+            var baseUrl = EnsureTrailingSlash(Plugin.Instance?.Configuration?.ApiBaseUrl, DefaultSiteBaseUrl);
+            _httpClient.BaseAddress = new Uri(baseUrl);
         }
     }
 
@@ -125,6 +126,9 @@ public class RezeroApiClient : IRezeroApiClient
             return null;
         }
 
+        var hlsBase = EnsureTrailingSlash(Plugin.Instance?.Configuration?.HlsBaseUrl, DefaultHlsBaseUrl);
+        var downloadsBase = EnsureTrailingSlash(Plugin.Instance?.Configuration?.DownloadsBaseUrl, DefaultDownloadsBaseUrl);
+
         // Direct MP4 requested
         if (string.Equals(format, "direct_mp4", StringComparison.OrdinalIgnoreCase))
         {
@@ -134,13 +138,19 @@ public class RezeroApiClient : IRezeroApiClient
                 var arcPart = parts[^5];
                 var epPart = parts[^4];
                 var namePart = parts[^2];
-                return $"{DownloadsBaseUrl}{arcPart}/{epPart}/{namePart}.mp4";
+                return $"{downloadsBase}{arcPart}/{epPart}/{namePart}.mp4";
             }
         }
 
         // Fallback or HLS requested
         return relativePath.StartsWith("http", StringComparison.OrdinalIgnoreCase)
             ? relativePath
-            : $"{HlsBaseUrl}{relativePath}";
+            : $"{hlsBase}{relativePath.TrimStart('/')}";
+    }
+
+    private static string EnsureTrailingSlash(string? url, string fallback)
+    {
+        var value = string.IsNullOrWhiteSpace(url) ? fallback : url.Trim();
+        return value.EndsWith('/') ? value : value + "/";
     }
 }

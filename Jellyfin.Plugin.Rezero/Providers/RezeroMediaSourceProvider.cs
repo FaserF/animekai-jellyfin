@@ -23,8 +23,15 @@ namespace Jellyfin.Plugin.Rezero.Providers;
 /// </summary>
 public class RezeroMediaSourceProvider : IMediaSourceProvider, IHasOrder
 {
-    private static readonly Regex ArcEpRegex = new(@"\[Arc\s*0?(\d+)\]\s*(.+?)(?:\s*\[(.*?)\])?$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    private static readonly Regex SeasonEpRegex = new(@"S\d+E(\d+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex DirectMp4UrlRegex = new(@"/downloads/([^/]+)/([^/]+)/([^/?#]+)\.mp4", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex HlsUrlRegex = new(@"/HLS/([^/]+)/([^/]+)/[^/]+/([^/]+)/index\.m3u8", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex ArcFileRegex = new(@"\[Arc\s*0?(\d+)\]", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex EpFileRegex = new(@"Episode\s*(\d+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex SeasonEpFileRegex = new(@"S\d+E(\d+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex BracketEnRegex = new(@"\[(?:[^\]]*\b)?EN(?:\b[^\]]*)?\]", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex BracketCleanRegex = new(@"\[(?:[^\]]*\b)?Clean(?:\b[^\]]*)?\]", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex WordEnRegex = new(@"\bEN\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex CcRegex = new(@"\bCC\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     private readonly ILogger<RezeroMediaSourceProvider> _logger;
 
@@ -62,18 +69,25 @@ public class RezeroMediaSourceProvider : IMediaSourceProvider, IHasOrder
         // Check if file is related to Re:Zero Perfect Run
         var isRezero = path.Contains("Re - ZERO", StringComparison.OrdinalIgnoreCase) ||
                        path.Contains("Re:Zero", StringComparison.OrdinalIgnoreCase) ||
+                       path.Contains("Re ZERO", StringComparison.OrdinalIgnoreCase) ||
+                       path.Contains("/rezero/", StringComparison.OrdinalIgnoreCase) ||
+                       path.Contains("\\rezero\\", StringComparison.OrdinalIgnoreCase) ||
                        path.Contains("[The Perfect Run]", StringComparison.OrdinalIgnoreCase);
 
-        if (!isRezero && File.Exists(path))
+        string? strmContent = null;
+        if (File.Exists(path))
         {
             try
             {
-                var content = await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false);
-                isRezero = content.Contains("rezeroperfect.run", StringComparison.OrdinalIgnoreCase);
+                strmContent = (await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false)).Trim();
+                if (!isRezero && strmContent.Contains("rezeroperfect.run", StringComparison.OrdinalIgnoreCase))
+                {
+                    isRezero = true;
+                }
             }
-            catch
+            catch (Exception ex)
             {
-                // Ignore I/O read errors
+                _logger.LogDebug(ex, "Could not inspect .strm file at {Path}", path);
             }
         }
 
@@ -82,8 +96,8 @@ public class RezeroMediaSourceProvider : IMediaSourceProvider, IHasOrder
             return Array.Empty<MediaSourceInfo>();
         }
 
-        var (arcNumber, epNumber, lang, captions) = ParseEpisodeDetails(path);
-        if (arcNumber <= 0 || epNumber <= 0)
+        var (arcPart, epPart, streamName, lang, captions) = ResolveStreamParts(path, strmContent);
+        if (string.IsNullOrWhiteSpace(arcPart) || string.IsNullOrWhiteSpace(epPart) || string.IsNullOrWhiteSpace(streamName))
         {
             return Array.Empty<MediaSourceInfo>();
         }
@@ -99,11 +113,6 @@ public class RezeroMediaSourceProvider : IMediaSourceProvider, IHasOrder
         var hlsBase = config.HlsBaseUrl.TrimEnd('/') + "/";
         var downloadsBase = config.DownloadsBaseUrl.TrimEnd('/') + "/";
         var isDirectMp4Preferred = string.Equals(config.StreamFormat, "direct_mp4", StringComparison.OrdinalIgnoreCase);
-
-        var arcPart = $"ARC%20{arcNumber:D2}";
-        var epPart = $"EP%20{epNumber}";
-        var tag = captions == "cc" ? $"{lang.ToUpperInvariant()}%20BURNED%20CC" : lang.ToUpperInvariant();
-        var streamName = $"ARC%20{arcNumber:D2}%20-%20EP%20{epNumber}%20-%20{tag}";
 
         for (var i = 0; i < qualities.Length; i++)
         {
@@ -176,18 +185,54 @@ public class RezeroMediaSourceProvider : IMediaSourceProvider, IHasOrder
     public Task<ILiveStream> OpenMediaSource(string openToken, List<ILiveStream> currentLiveStreams, CancellationToken cancellationToken) =>
         Task.FromResult<ILiveStream>(null!);
 
-    private static (int ArcNumber, int EpNumber, string Lang, string Captions) ParseEpisodeDetails(string path)
+    private static (string ArcPart, string EpPart, string StreamName, string Lang, string Captions) ResolveStreamParts(
+        string path,
+        string? strmContent)
     {
-        var fileName = Path.GetFileNameWithoutExtension(path);
-        var arcMatch = Regex.Match(fileName, @"\[Arc\s*0?(\d+)\]", RegexOptions.IgnoreCase);
-        var arcNum = arcMatch.Success && int.TryParse(arcMatch.Groups[1].Value, out var a) ? a : 1;
+        if (!string.IsNullOrWhiteSpace(strmContent))
+        {
+            var urlMatch = DirectMp4UrlRegex.Match(strmContent);
+            if (!urlMatch.Success)
+            {
+                urlMatch = HlsUrlRegex.Match(strmContent);
+            }
 
-        var epMatch = Regex.Match(fileName, @"Episode\s*(\d+)", RegexOptions.IgnoreCase);
+            if (urlMatch.Success)
+            {
+                var arcPart = urlMatch.Groups[1].Value;
+                var epPart = urlMatch.Groups[2].Value;
+                var streamName = urlMatch.Groups[3].Value;
+                var decodedName = Uri.UnescapeDataString(streamName);
+                var lang = WordEnRegex.IsMatch(decodedName) ? "en" : "jp";
+                var captions = CcRegex.IsMatch(decodedName) ? "cc" : "off";
+                return (arcPart, epPart, streamName, lang, captions);
+            }
+        }
+
+        var fileName = Path.GetFileNameWithoutExtension(path);
+        var arcMatch = ArcFileRegex.Match(fileName);
+        var epMatch = EpFileRegex.Match(fileName);
+        if (!epMatch.Success)
+        {
+            epMatch = SeasonEpFileRegex.Match(fileName);
+        }
+
+        if (!arcMatch.Success && !epMatch.Success)
+        {
+            return (string.Empty, string.Empty, string.Empty, "jp", "cc");
+        }
+
+        var arcNum = arcMatch.Success && int.TryParse(arcMatch.Groups[1].Value, out var a) ? a : 1;
         var epNum = epMatch.Success && int.TryParse(epMatch.Groups[1].Value, out var e) ? e : 1;
 
-        var lang = fileName.Contains("EN", StringComparison.OrdinalIgnoreCase) ? "en" : "jp";
-        var captions = fileName.Contains("Clean", StringComparison.OrdinalIgnoreCase) ? "off" : "cc";
+        var fallbackLang = BracketEnRegex.IsMatch(fileName) ? "en" : "jp";
+        var fallbackCaptions = BracketCleanRegex.IsMatch(fileName) ? "off" : "cc";
 
-        return (arcNum, epNum, lang, captions);
+        var parsedArcPart = $"ARC%20{arcNum:D2}";
+        var parsedEpPart = $"EP%20{epNum}";
+        var tag = fallbackCaptions == "cc" ? $"{fallbackLang.ToUpperInvariant()}%20BURNED%20CC" : fallbackLang.ToUpperInvariant();
+        var parsedStreamName = $"ARC%20{arcNum:D2}%20-%20EP%20{epNum}%20-%20{tag}";
+
+        return (parsedArcPart, parsedEpPart, parsedStreamName, fallbackLang, fallbackCaptions);
     }
 }

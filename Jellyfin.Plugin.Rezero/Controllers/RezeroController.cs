@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.Rezero.Api;
@@ -46,9 +47,31 @@ public class RezeroController : ControllerBase
     public ActionResult<object> GetStatus()
     {
         var seriesPath = _syncService.ResolveSeriesPath();
+        var storage = _syncService.ResolveStoragePaths();
+        var isSymlinkActive = false;
+        if (!string.IsNullOrWhiteSpace(storage?.TargetSeasonPath))
+        {
+            try
+            {
+                isSymlinkActive = !string.IsNullOrEmpty(new DirectoryInfo(storage.TargetSeasonPath).LinkTarget);
+            }
+            catch
+            {
+                isSymlinkActive = false;
+            }
+        }
+
         return Ok(new
         {
             SeriesPath = seriesPath,
+            TargetSeasonPath = storage?.TargetSeasonPath,
+            ResolvedStoragePath = storage?.PhysicalStoragePath,
+            StorageDetectionMode = storage?.DetectionMode,
+            StorageDetectionReason = storage?.Reason,
+            UseSymlink = storage?.UseSymlink ?? Config.EnableSymlink,
+            IsSymlinkActive = isSymlinkActive,
+            DedicatedStoragePath = Config.DedicatedStoragePath,
+            EnableSymlink = Config.EnableSymlink,
             LastSyncUtc = Config.LastSyncUtc,
             LastSyncStatus = Config.LastSyncStatus,
             TotalSyncedEpisodes = Config.TotalSyncedEpisodes,

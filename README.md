@@ -39,8 +39,9 @@
 
 Traditional integration requires downloading hundreds of gigabytes of video files. The **Jellyfin Re:Zero Plugin** eliminates storage bottlenecks:
 - **No Video Downloads**: Uses lightweight `.strm` streaming pointers pointing to direct high-speed CDNs.
-- **Official Look & Feel**: Automatically attaches to your existing `Re:Zero` series as **Season 00 (Specials)**, complete with arc artwork, episode titles, and plot summaries.
-- **Cloud & rclone Ready**: Directly writes to Google Drive rclone mounts (e.g. `cloud_pool_crypt:tv/Re - ZERO.../Season 00/`), keeping 0 bytes on your server's local NVMe.
+- **Official Look & Feel**: Automatically attaches to your existing `Re:Zero` series as **Season 00 (Specials)** (or creates a standalone series), complete with arc artwork, episode titles, and plot summaries.
+- **Fast Local Dedicated Folder + Symlink**: Automatically detects mergerfs/rclone cloud mounts and stores tiny `.strm`/`.nfo` files (~500 KB total) on fast local disk (e.g. `/data/rezero/Season 00`), exposing them cleanly into your library via symlink with zero cloud API latency.
+- **In-Player Quality Selection**: Offers 1080p Direct MP4, 720p HD, and 480p SD streams dynamically inside Jellyfin's Version/Quality dropdown.
 - **100% API Powered**: Fetches structured metadata via clean JSON endpoints (`videos.json`, `episodes/arcXX.json`, and `updates.json`) with zero fragile web scraping.
 
 ---
@@ -54,16 +55,17 @@ flowchart TD
     Task["RezeroSyncTask (Scheduled Task)"] -->|Periodic Check (Every 12h)| SyncService
     UI["Jellyfin Web Dashboard"] -->|Manual Sync Trigger| SyncService
 
-    SyncService --> TargetSeries["Series Path Discovery<br>(Auto-detects Re:Zero in TV Library)"]
+    SyncService --> TargetSeries["Series & Mount Discovery<br>(StoragePathResolver)"]
     TargetSeries --> Writer["Strm & NFO Generator"]
 
     Writer --> StrmFiles[".strm Stream Files<br>(Universal 1080p Direct MP4 / HLS)"]
     Writer --> NfoFiles[".nfo Metadata Files<br>(Arc Info, Episode Plots, Intro/Outro)"]
 
-    StrmFiles --> Storage["Target Storage / Google Drive rclone<br>(.../Season 00/)"]
-    NfoFiles --> Storage
+    StrmFiles --> LocalStore["Dedicated Fast Local Folder<br>(e.g. /data/rezero/Season 00)"]
+    NfoFiles --> LocalStore
+    LocalStore -.->|Symlink| SeriesSeason["Series Folder<br>(.../Season 00/)"]
 
-    Storage --> JellyfinServer["Jellyfin Media Server<br>(Specials Season)"]
+    SeriesSeason --> JellyfinServer["Jellyfin Media Server<br>(IMediaSourceProvider Multi-Quality)"]
     SyncService -->|Trigger| LibraryScan["Jellyfin Library Scanner"]
 ```
 
@@ -122,14 +124,19 @@ Jellyfin's **Intro Skipper** / **TheIntroDB** plugin instantly picks up these ti
 
 | Setting | Type | Default | Description |
 |---|---|---|---|
+| `IntegrationMode` | `string` | `"SpecialSeason"` | `"SpecialSeason"` or `"StandaloneSeries"`. |
+| `TargetSeriesPath` | `string` | `""` | Custom path to Re:Zero series directory (auto-detected if blank). |
+| `SeasonFolder` | `string` | `"Season 00"` | Subfolder inside series for the specials. |
+| `EnableSymlink` | `bool` | `true` | Stores `.strm`/`.nfo` files in a dedicated local folder and exposes them via symlink. |
+| `DedicatedStoragePath` | `string` | `""` | Optional manual dedicated local folder; blank enables dynamic auto-detection. |
+| `OfferAllQualitiesInPlayer` | `bool` | `true` | Dynamically supplies 1080p/720p/480p options in Jellyfin player UI. |
+| `EnableMultiVersionFiles` | `bool` | `false` | Writes separate physical `.strm` files per resolution on disk. |
 | `EnableAutoSync` | `bool` | `true` | Enables background periodic synchronization. |
 | `SyncIntervalHours` | `int` | `12` | Frequency of update checks (1–168 hours). |
 | `PreferredLanguage` | `string` | `"jp"` | `"jp"`, `"en"`, or `"both"`. |
 | `PreferredCaptions` | `string` | `"cc"` | `"cc"` (hardcoded subtitles), `"off"` (clean), or `"both"`. |
 | `PreferredQuality` | `string` | `"1080p"` | Stream resolution (`"1080p"`, `"720p"`, `"480p"`). |
 | `StreamFormat` | `string` | `"direct_mp4"` | `"direct_mp4"` or `"hls_m3u8"`. |
-| `TargetSeriesPath` | `string` | `""` | Custom path to Re:Zero series directory (auto-detected if blank). |
-| `SeasonFolder` | `string` | `"Season 00"` | Subfolder inside series for the specials. |
 
 ---
 

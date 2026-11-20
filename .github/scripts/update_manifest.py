@@ -55,7 +55,7 @@ def main():
     target_abis = ["12.0.0.0", "10.10.0.0"]
 
     for plugin in manifest:
-        if plugin.get("guid", "").lower() == "b4c8e3a2-9f1d-4a7e-8b2c-6d5e4f3a2b1c":
+        if plugin.get("guid", "").lower() == "aaf63d7c-95e2-4cda-a6fc-7fbea2b90f8a":
             existing_versions = plugin.get("versions", [])
             updated_versions = [v for v in existing_versions if v.get("version") != args.version]
 

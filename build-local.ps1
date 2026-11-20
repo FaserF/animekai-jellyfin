@@ -10,7 +10,9 @@ if (Get-Command dotnet -ErrorAction SilentlyContinue) {
     if ($sdks) {
         Write-Host "Running local build via installed .NET SDK..." -ForegroundColor Cyan
         dotnet restore
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         dotnet build -c Release --no-restore
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         dotnet run --project Jellyfin.Plugin.Rezero.Tests -c Release --no-build
         if ($LASTEXITCODE -eq 0) {
             Write-Host "Local build & tests completed successfully!" -ForegroundColor Green
