@@ -58,12 +58,15 @@
                             <label class="selectLabel" for="selectSyncMode">Synchronization Mode</label>
                             <select is="emby-select" id="selectSyncMode" name="SyncMode" class="emby-select">
                                 <option value="Stream">Stream (.strm pointers &mdash; zero video disk usage, Default)</option>
-                                <option value="Download">Download (Full 1080p MP4 files downloaded sequentially)</option>
+                                <option value="Download">Download (Full 1080p MP4 files downloaded sequentially via Direct HTTPS)</option>
                             </select>
-                            <div class="fieldDescription">rezeroperfect.run natively provides both streaming and 1080p MP4 downloads. Downloads are processed sequentially on a single connection to respect upstream server slot limits.</div>
+                            <div class="fieldDescription">rezeroperfect.run natively provides both adaptive HLS streaming and direct 1080p MP4 downloads over encrypted TLS/HTTPS. <strong>No BitTorrent or P2P networks are ever used</strong> &mdash; all downloads and streams are strictly private 1:1 client HTTPS connections from the official CDN with zero public swarm seeding.</div>
                         </div>
 
                         <div id="containerDownloadOptions" style="display: none; padding-left: 12px; border-left: 2px solid #00a4dc; margin-bottom: 16px;">
+                            <div style="background-color: rgba(0, 164, 220, 0.15); border: 1px solid #00a4dc; border-radius: 6px; padding: 10px 14px; margin-bottom: 14px; font-size: 0.9em; line-height: 1.4;">
+                                <strong>Direct HTTPS Download (No P2P / No Torrent):</strong> Episodes are downloaded directly from Cloudflare-fronted media storage over HTTPS. No BitTorrent protocol is used, eliminating public IP exposure in P2P swarms or upload/seeding legal concerns.
+                            </div>
                             <div class="inputContainer">
                                 <label class="inputLabel inputLabelUnfocused" for="txtMaxDownloadsPerRun">Max New Downloads Per Run (0 = Unlimited)</label>
                                 <input is="emby-input" type="number" id="txtMaxDownloadsPerRun" name="MaxDownloadsPerRun" class="emby-input" min="0" max="60" value="0" />
