@@ -175,8 +175,13 @@ internal static class RezeroStorageLinker
         int globalEpisodeIndex,
         int seasonNumber,
         string showTitle,
-        string variantSuffix)
+        string variantSuffix,
+        string language = "jp",
+        string captions = "cc")
     {
+        var langCode = language.Equals("en", StringComparison.OrdinalIgnoreCase) ? "eng" : "jpn";
+        var hasSubtitles = captions.Equals("cc", StringComparison.OrdinalIgnoreCase);
+
         var doc = new XDocument(
             new XDeclaration("1.0", "utf-8", "yes"),
             new XElement("episodedetails",
@@ -191,7 +196,26 @@ internal static class RezeroStorageLinker
                     new XElement("end", episode.Segments.Intro.End)) : null,
                 episode.Segments?.Outro != null ? new XElement("outro",
                     new XElement("start", episode.Segments.Outro.Start),
-                    new XElement("end", episode.Segments.Outro.End)) : null
+                    new XElement("end", episode.Segments.Outro.End)) : null,
+                new XElement("fileinfo",
+                    new XElement("streamdetails",
+                        new XElement("video",
+                            new XElement("codec", "h264"),
+                            new XElement("width", "1920"),
+                            new XElement("height", "1080"),
+                            new XElement("aspect", "16:9")
+                        ),
+                        new XElement("audio",
+                            new XElement("codec", "aac"),
+                            new XElement("language", langCode),
+                            new XElement("channels", "2")
+                        ),
+                        hasSubtitles ? new XElement("subtitle",
+                            new XElement("language", "eng"),
+                            new XElement("forced", "true")
+                        ) : null
+                    )
+                )
             )
         );
 

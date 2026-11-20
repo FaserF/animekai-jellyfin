@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -18,8 +19,9 @@ namespace Jellyfin.Plugin.Rezero.Providers;
 
 /// <summary>
 /// Dynamic MediaSource provider for Re:Zero Perfect Run episodes.
-/// Enables in-player quality switching (1080p, 720p, 480p) across all Jellyfin client apps
-/// without needing duplicate files on disk.
+/// Exposes fast adaptive HLS streams and multi-language / multi-caption versions
+/// (Japanese + English Subtitles, Clean Japanese, English Dub, English Dub + CC)
+/// directly in Jellyfin client players without requiring duplicated files on disk.
 /// </summary>
 public class RezeroMediaSourceProvider : IMediaSourceProvider, IHasOrder
 {
@@ -28,10 +30,6 @@ public class RezeroMediaSourceProvider : IMediaSourceProvider, IHasOrder
     private static readonly Regex ArcFileRegex = new(@"\[Arc\s*0?(\d+)\]", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex EpFileRegex = new(@"Episode\s*(\d+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex SeasonEpFileRegex = new(@"S\d+E(\d+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    private static readonly Regex BracketEnRegex = new(@"\[(?:[^\]]*\b)?EN(?:\b[^\]]*)?\]", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    private static readonly Regex BracketCleanRegex = new(@"\[(?:[^\]]*\b)?Clean(?:\b[^\]]*)?\]", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    private static readonly Regex WordEnRegex = new(@"\bEN\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    private static readonly Regex CcRegex = new(@"\bCC\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     private readonly ILogger<RezeroMediaSourceProvider> _logger;
 
@@ -49,7 +47,7 @@ public class RezeroMediaSourceProvider : IMediaSourceProvider, IHasOrder
     /// <inheritdoc />
     public async Task<IEnumerable<MediaSourceInfo>> GetMediaSources(BaseItem item, CancellationToken cancellationToken)
     {
-        if (item is not Episode episode)
+        if (item is not Episode)
         {
             return Array.Empty<MediaSourceInfo>();
         }
@@ -75,7 +73,7 @@ public class RezeroMediaSourceProvider : IMediaSourceProvider, IHasOrder
                        path.Contains("[The Perfect Run]", StringComparison.OrdinalIgnoreCase);
 
         string? strmContent = null;
-        if (File.Exists(path))
+        if (File.Exists(path) && path.EndsWith(".strm", StringComparison.OrdinalIgnoreCase))
         {
             try
             {
@@ -96,40 +94,51 @@ public class RezeroMediaSourceProvider : IMediaSourceProvider, IHasOrder
             return Array.Empty<MediaSourceInfo>();
         }
 
-        var (arcPart, epPart, streamName, lang, captions) = ResolveStreamParts(path, strmContent);
-        if (string.IsNullOrWhiteSpace(arcPart) || string.IsNullOrWhiteSpace(epPart) || string.IsNullOrWhiteSpace(streamName))
+        var (arcPart, epPart, basePrefix) = ResolveStreamParts(path, strmContent);
+        if (string.IsNullOrWhiteSpace(arcPart) || string.IsNullOrWhiteSpace(epPart) || string.IsNullOrWhiteSpace(basePrefix))
         {
             return Array.Empty<MediaSourceInfo>();
         }
 
-        var sources = new List<MediaSourceInfo>();
-        var qualities = new[]
+        var variants = new[]
         {
-            new { Name = "1080p (Full HD)", Code = "1080p", Width = 1920, Height = 1080, Bitrate = 8000000 },
-            new { Name = "720p (HD)", Code = "720p", Width = 1280, Height = 720, Bitrate = 4000000 },
-            new { Name = "480p (SD)", Code = "480p", Width = 854, Height = 480, Bitrate = 1500000 }
+            new { Key = "jp_cc", Name = "Japanese (English Subtitles)", Suffix = "JP BURNED CC", Lang = "jpn", AudioTitle = "Japanese 2.0", HasSubtitles = true },
+            new { Key = "jp", Name = "Japanese (Clean / No Subtitles)", Suffix = "JP", Lang = "jpn", AudioTitle = "Japanese 2.0", HasSubtitles = false },
+            new { Key = "en", Name = "English Dub (Clean / No Subtitles)", Suffix = "EN", Lang = "eng", AudioTitle = "English 2.0", HasSubtitles = false },
+            new { Key = "en_cc", Name = "English Dub (English Subtitles)", Suffix = "EN BURNED CC", Lang = "eng", AudioTitle = "English 2.0", HasSubtitles = true }
         };
 
-        var hlsBase = config.HlsBaseUrl.TrimEnd('/') + "/";
-        var downloadsBase = config.DownloadsBaseUrl.TrimEnd('/') + "/";
-        var isDirectMp4Preferred = string.Equals(config.StreamFormat, "direct_mp4", StringComparison.OrdinalIgnoreCase);
-
-        for (var i = 0; i < qualities.Length; i++)
+        var prefLang = (config.PreferredLanguage ?? "jp").ToLowerInvariant();
+        var prefCaps = (config.PreferredCaptions ?? "cc").ToLowerInvariant();
+        var preferredKey = prefLang switch
         {
-            var q = qualities[i];
+            "en" => prefCaps == "off" ? "en" : "en_cc",
+            _ => prefCaps == "off" ? "jp" : "jp_cc"
+        };
+
+        var sortedVariants = variants.OrderBy(v => v.Key == preferredKey ? 0 : 1).ToList();
+
+        var hlsBase = EnsureTrailingSlash(config.HlsBaseUrl, "https://media.rezeroperfect.run/HLS/");
+        var downloadsBase = EnsureTrailingSlash(config.DownloadsBaseUrl, "https://media.rezeroperfect.run/downloads/");
+        var isDirectMp4 = string.Equals(config.StreamFormat, "direct_mp4", StringComparison.OrdinalIgnoreCase);
+
+        var sources = new List<MediaSourceInfo>();
+        for (var i = 0; i < sortedVariants.Count; i++)
+        {
+            var v = sortedVariants[i];
+            var streamName = $"{basePrefix} - {v.Suffix}";
+            var escapedStreamName = Uri.EscapeDataString(streamName);
+
             string streamUrl;
             string container;
-
-            if (i == 0 && isDirectMp4Preferred)
+            if (isDirectMp4)
             {
-                // 1080p Direct MP4 download stream
-                streamUrl = $"{downloadsBase}{arcPart}/{epPart}/{streamName}.mp4";
+                streamUrl = $"{downloadsBase}{arcPart}/{epPart}/{escapedStreamName}.mp4";
                 container = "mp4";
             }
             else
             {
-                // HLS adaptive / multi-quality stream
-                streamUrl = $"{hlsBase}{arcPart}/{epPart}/{q.Code}/{streamName}/index.m3u8";
+                streamUrl = $"{hlsBase}{arcPart}/{epPart}/auto/{escapedStreamName}/index.m3u8";
                 container = "m3u8";
             }
 
@@ -140,10 +149,10 @@ public class RezeroMediaSourceProvider : IMediaSourceProvider, IHasOrder
                     Type = MediaStreamType.Video,
                     Index = 0,
                     Codec = "h264",
-                    Width = q.Width,
-                    Height = q.Height,
-                    BitRate = q.Bitrate,
-                    IsDefault = i == 0
+                    Width = 1920,
+                    Height = 1080,
+                    BitRate = 8000000,
+                    IsDefault = true
                 },
                 new()
                 {
@@ -151,26 +160,41 @@ public class RezeroMediaSourceProvider : IMediaSourceProvider, IHasOrder
                     Index = 1,
                     Codec = "aac",
                     Channels = 2,
-                    Language = lang,
-                    Title = lang == "en" ? "English 2.0" : "Japanese 2.0",
+                    Language = v.Lang,
+                    Title = v.AudioTitle,
                     IsDefault = true
                 }
             };
 
+            if (v.HasSubtitles)
+            {
+                mediaStreams.Add(new MediaStream
+                {
+                    Type = MediaStreamType.Subtitle,
+                    Index = 2,
+                    Codec = "subrip",
+                    Language = "eng",
+                    Title = "English (Burned In)",
+                    IsDefault = true,
+                    IsForced = true
+                });
+            }
+
             var sourceInfo = new MediaSourceInfo
             {
-                Id = $"{item.Id:N}_{q.Code}",
-                Name = q.Name,
+                Id = i == 0 ? item.Id.ToString("N") : $"{item.Id:N}_{v.Key}",
+                Name = v.Name,
                 Path = streamUrl,
                 Protocol = MediaProtocol.Http,
                 Container = container,
-                Bitrate = q.Bitrate,
+                Bitrate = 8000000,
                 IsRemote = true,
                 SupportsDirectPlay = true,
                 SupportsDirectStream = true,
                 SupportsTranscoding = true,
                 SupportsProbing = false,
                 DefaultAudioStreamIndex = 1,
+                DefaultSubtitleStreamIndex = v.HasSubtitles ? 2 : null,
                 RunTimeTicks = item.RunTimeTicks,
                 MediaStreams = mediaStreams
             };
@@ -185,7 +209,7 @@ public class RezeroMediaSourceProvider : IMediaSourceProvider, IHasOrder
     public Task<ILiveStream> OpenMediaSource(string openToken, List<ILiveStream> currentLiveStreams, CancellationToken cancellationToken) =>
         Task.FromResult<ILiveStream>(null!);
 
-    private static (string ArcPart, string EpPart, string StreamName, string Lang, string Captions) ResolveStreamParts(
+    private static (string ArcPart, string EpPart, string BasePrefix) ResolveStreamParts(
         string path,
         string? strmContent)
     {
@@ -201,15 +225,16 @@ public class RezeroMediaSourceProvider : IMediaSourceProvider, IHasOrder
             {
                 var arcPart = urlMatch.Groups[1].Value;
                 var epPart = urlMatch.Groups[2].Value;
-                var streamName = urlMatch.Groups[3].Value;
-                var decodedName = Uri.UnescapeDataString(streamName);
-                var lang = WordEnRegex.IsMatch(decodedName) ? "en" : "jp";
-                var captions = CcRegex.IsMatch(decodedName) ? "cc" : "off";
-                return (arcPart, epPart, streamName, lang, captions);
+                var rawStreamName = urlMatch.Groups[3].Value;
+                var decodedName = Uri.UnescapeDataString(rawStreamName);
+                var basePrefix = StripVariantSuffix(decodedName);
+                return (arcPart, epPart, basePrefix);
             }
         }
 
         var fileName = Path.GetFileNameWithoutExtension(path);
+        var isMemorySnow = fileName.Contains("Memory Snow", StringComparison.OrdinalIgnoreCase);
+
         var arcMatch = ArcFileRegex.Match(fileName);
         var epMatch = EpFileRegex.Match(fileName);
         if (!epMatch.Success)
@@ -217,22 +242,37 @@ public class RezeroMediaSourceProvider : IMediaSourceProvider, IHasOrder
             epMatch = SeasonEpFileRegex.Match(fileName);
         }
 
-        if (!arcMatch.Success && !epMatch.Success)
-        {
-            return (string.Empty, string.Empty, string.Empty, "jp", "cc");
-        }
-
-        var arcNum = arcMatch.Success && int.TryParse(arcMatch.Groups[1].Value, out var a) ? a : 1;
+        var arcNum = arcMatch.Success && int.TryParse(arcMatch.Groups[1].Value, out var a) ? a : (isMemorySnow ? 2 : 1);
         var epNum = epMatch.Success && int.TryParse(epMatch.Groups[1].Value, out var e) ? e : 1;
 
-        var fallbackLang = BracketEnRegex.IsMatch(fileName) ? "en" : "jp";
-        var fallbackCaptions = BracketCleanRegex.IsMatch(fileName) ? "off" : "cc";
-
         var parsedArcPart = $"ARC%20{arcNum:D2}";
-        var parsedEpPart = $"EP%20{epNum}";
-        var tag = fallbackCaptions == "cc" ? $"{fallbackLang.ToUpperInvariant()}%20BURNED%20CC" : fallbackLang.ToUpperInvariant();
-        var parsedStreamName = $"ARC%20{arcNum:D2}%20-%20EP%20{epNum}%20-%20{tag}";
+        if (isMemorySnow)
+        {
+            return (parsedArcPart, "Memory%20Snow", "ARC 02 - Memory Snow");
+        }
 
-        return (parsedArcPart, parsedEpPart, parsedStreamName, fallbackLang, fallbackCaptions);
+        var parsedEpPart = $"EP%20{epNum}";
+        var parsedBasePrefix = $"ARC {arcNum:D2} - EP {epNum}";
+        return (parsedArcPart, parsedEpPart, parsedBasePrefix);
+    }
+
+    private static string StripVariantSuffix(string name)
+    {
+        var suffixes = new[] { " - JP BURNED CC", " - JP", " - EN BURNED CC", " - EN" };
+        foreach (var s in suffixes)
+        {
+            if (name.EndsWith(s, StringComparison.OrdinalIgnoreCase))
+            {
+                return name.Substring(0, name.Length - s.Length);
+            }
+        }
+
+        return name;
+    }
+
+    private static string EnsureTrailingSlash(string? url, string fallback)
+    {
+        var value = string.IsNullOrWhiteSpace(url) ? fallback : url.Trim();
+        return value.EndsWith('/') ? value : value + "/";
     }
 }

@@ -233,7 +233,7 @@ public class RezeroSyncService : IRezeroSyncService
                             var nfoFile = Path.Combine(writeDir, $"{fileNameBase}.nfo");
 
                             await RezeroStorageLinker.WriteIfChangedAsync(strmFile, streamUrl.Trim(), cancellationToken).ConfigureAwait(false);
-                            var nfoContent = RezeroStorageLinker.BuildEpisodeNfo(arc, episode, globalEpisodeIndex, config.SeasonNumber, showTitle, variantSuffix);
+                            var nfoContent = RezeroStorageLinker.BuildEpisodeNfo(arc, episode, globalEpisodeIndex, config.SeasonNumber, showTitle, variantSuffix, lang, cap);
                             await RezeroStorageLinker.WriteIfChangedAsync(nfoFile, nfoContent, cancellationToken).ConfigureAwait(false);
 
                             if (!string.IsNullOrWhiteSpace(perFileSymlinkDir))
@@ -336,7 +336,7 @@ public class RezeroSyncService : IRezeroSyncService
                             _logger.LogInformation("Skipped existing verified MP4: {File}", mp4File);
                         }
 
-                        var nfoContent = RezeroStorageLinker.BuildEpisodeNfo(arc, episode, globalEpisodeIndex, config.SeasonNumber, showTitle, variantSuffix);
+                        var nfoContent = RezeroStorageLinker.BuildEpisodeNfo(arc, episode, globalEpisodeIndex, config.SeasonNumber, showTitle, variantSuffix, lang, cap);
                         await RezeroStorageLinker.WriteIfChangedAsync(nfoFile, nfoContent, cancellationToken).ConfigureAwait(false);
 
                         if (config.CleanOppositeModeFiles)

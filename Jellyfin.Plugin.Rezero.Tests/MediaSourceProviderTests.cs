@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using FluentAssertions;
 using Jellyfin.Plugin.Rezero.Providers;
 using MediaBrowser.Controller.Entities.TV;
+using MediaBrowser.Model.Entities;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -26,17 +27,16 @@ public class MediaSourceProviderTests
         var sources = (await provider.GetMediaSources(episode, CancellationToken.None)).ToList();
 
         sources.Should().NotBeEmpty();
-        sources.Should().HaveCount(3); // 1080p, 720p, 480p
+        sources.Should().HaveCount(4); // JP CC, JP Clean, EN Clean, EN CC
 
-        sources[0].Name.Should().Contain("1080p");
+        sources[0].Name.Should().Contain("Japanese");
         sources[0].SupportsDirectPlay.Should().BeTrue();
+        sources[0].Path.Should().Contain("auto");
         sources[0].Path.Should().Contain("JP%20BURNED%20CC");
+        sources[0].MediaStreams.Should().Contain(s => s.Type == MediaStreamType.Subtitle && s.Language == "eng");
 
-        sources[1].Name.Should().Contain("720p");
-        sources[1].Path.Should().Contain("720p");
-
-        sources[2].Name.Should().Contain("480p");
-        sources[2].Path.Should().Contain("480p");
+        sources.Should().Contain(s => s.Name.Contains("Clean") && s.Path.Contains("JP/index.m3u8"));
+        sources.Should().Contain(s => s.Name.Contains("English Dub"));
     }
 
     [Fact]
@@ -51,7 +51,7 @@ public class MediaSourceProviderTests
 
         var sources = (await provider.GetMediaSources(episode, CancellationToken.None)).ToList();
 
-        sources.Should().HaveCount(3);
+        sources.Should().HaveCount(4);
         sources[0].Path.Should().Contain("JP%20BURNED%20CC");
         sources[0].Path.Should().NotContain("EN");
     }
@@ -68,8 +68,8 @@ public class MediaSourceProviderTests
 
         var sources = (await provider.GetMediaSources(episode, CancellationToken.None)).ToList();
 
-        sources.Should().HaveCount(3);
-        sources[0].Path.Should().Contain("EN%20BURNED%20CC");
+        sources.Should().HaveCount(4);
+        sources.Should().Contain(s => s.Path.Contains("EN%20BURNED%20CC"));
     }
 
     [Fact]
@@ -90,10 +90,9 @@ public class MediaSourceProviderTests
 
             var sources = (await provider.GetMediaSources(episode, TestContext.Current.CancellationToken)).ToList();
 
-            sources.Should().HaveCount(3);
-            sources[0].Path.Should().Be("https://media.rezeroperfect.run/downloads/ARC%2003/EP%204/ARC%2003%20-%20EP%204%20-%20EN.mp4");
-            sources[1].Path.Should().Be("https://media.rezeroperfect.run/HLS/ARC%2003/EP%204/720p/ARC%2003%20-%20EP%204%20-%20EN/index.m3u8");
-            sources[2].Path.Should().Be("https://media.rezeroperfect.run/HLS/ARC%2003/EP%204/480p/ARC%2003%20-%20EP%204%20-%20EN/index.m3u8");
+            sources.Should().HaveCount(4);
+            sources.Should().Contain(s => s.Path == "https://media.rezeroperfect.run/HLS/ARC%2003/EP%204/auto/ARC%2003%20-%20EP%204%20-%20EN/index.m3u8");
+            sources.Should().Contain(s => s.Path == "https://media.rezeroperfect.run/HLS/ARC%2003/EP%204/auto/ARC%2003%20-%20EP%204%20-%20JP/index.m3u8");
         }
         finally
         {

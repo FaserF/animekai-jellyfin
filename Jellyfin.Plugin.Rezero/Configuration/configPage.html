@@ -133,10 +133,11 @@
                         </div>
 
                         <div class="selectContainer">
-                            <label class="selectLabel" for="selectStreamFormat">Primary Streaming Container</label>
+                            <label class="selectLabel" for="selectStreamFormat">Primary Streaming Format</label>
                             <select is="emby-select" id="selectStreamFormat" name="StreamFormat" class="emby-select">
-                                <option value="direct_mp4">Direct MP4 (Universal Direct Play without transcoding)</option>
-                                <option value="hls_m3u8">HLS (.m3u8 adaptive live stream)</option>
+                                <option value="hls_auto">HLS Adaptive Master Playlist (Instant startup &amp; zero buffering - Recommended)</option>
+                                <option value="hls_1080p">HLS 1080p (.m3u8 1080p only)</option>
+                                <option value="direct_mp4">Direct MP4 Download (.mp4 1080p)</option>
                             </select>
                         </div>
                     </div>
@@ -249,7 +250,7 @@
                     page.querySelector("#selectPreferredLanguage").value = config.PreferredLanguage || "jp";
                     page.querySelector("#selectPreferredCaptions").value = config.PreferredCaptions || "cc";
                     page.querySelector("#selectPreferredQuality").value = config.PreferredQuality || "1080p";
-                    page.querySelector("#selectStreamFormat").value = config.StreamFormat || "direct_mp4";
+                    page.querySelector("#selectStreamFormat").value = config.StreamFormat || "hls_auto";
                     page.querySelector("#txtApiBaseUrl").value = config.ApiBaseUrl || "https://rezeroperfect.run/";
 
                     updateModeVisibility(config.IntegrationMode || "SpecialSeason");
@@ -355,11 +356,14 @@
                         url: ApiClient.getUrl("Rezero/Sync")
                     }).then(function (res) {
                         Dashboard.hideLoadingMsg();
-                        Dashboard.alert({ message: res.message || "Synchronization finished." });
+                        var data = typeof res === "string" ? JSON.parse(res) : res;
+                        var msg = (data && data.message) ? data.message : "Synchronization finished.";
+                        Dashboard.alert({ message: msg });
                         loadConfig(page);
                     }).catch(function (err) {
                         Dashboard.hideLoadingMsg();
-                        Dashboard.alert({ message: "Sync failed: " + (err.message || err) });
+                        var errMsg = (err && err.message) ? err.message : JSON.stringify(err);
+                        Dashboard.alert({ message: "Sync failed: " + errMsg });
                     });
                 });
             });

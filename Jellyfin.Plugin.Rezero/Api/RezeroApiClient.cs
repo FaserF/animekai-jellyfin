@@ -1,6 +1,7 @@
 using System;
 using System.Net.Http;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.Rezero.Models;
@@ -159,7 +160,19 @@ public class RezeroApiClient : IRezeroApiClient
             }
         }
 
-        // Fallback or HLS requested
+        // HLS Auto requested (adaptive bitrate master playlist)
+        if (string.Equals(format, "hls_auto", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(quality, "auto", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(format, "hls", StringComparison.OrdinalIgnoreCase) ||
+            string.IsNullOrWhiteSpace(format))
+        {
+            var autoPath = Regex.Replace(relativePath, @"/(1080p|720p|480p)/", "/auto/", RegexOptions.IgnoreCase);
+            return autoPath.StartsWith("http", StringComparison.OrdinalIgnoreCase)
+                ? autoPath
+                : $"{hlsBase}{autoPath.TrimStart('/')}";
+        }
+
+        // Fallback or specific HLS resolution requested
         return relativePath.StartsWith("http", StringComparison.OrdinalIgnoreCase)
             ? relativePath
             : $"{hlsBase}{relativePath.TrimStart('/')}";

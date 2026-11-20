@@ -85,10 +85,10 @@ public class PluginConfiguration : BasePluginConfiguration
     public string PreferredQuality { get; set; } = "1080p";
 
     /// <summary>
-    /// Gets or sets the stream format ("direct_mp4" or "hls_m3u8").
-    /// Direct MP4 is recommended for universal Direct Play across web and TV apps.
+    /// Gets or sets the stream format ("hls_auto", "hls_1080p", or "direct_mp4").
+    /// "hls_auto" is recommended for instant startup, zero buffering, and multi-quality adaptive bitrate streaming.
     /// </summary>
-    public string StreamFormat { get; set; } = "direct_mp4";
+    public string StreamFormat { get; set; } = "hls_auto";
 
     /// <summary>
     /// Gets or sets the API base URL (customizable for local mirrors or proxies).

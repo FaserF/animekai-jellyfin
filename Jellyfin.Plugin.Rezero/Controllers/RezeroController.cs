@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Jellyfin.Plugin.Rezero.Api;
 using Jellyfin.Plugin.Rezero.Configuration;
 using Jellyfin.Plugin.Rezero.Services;
+using MediaBrowser.Common.Api;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -42,7 +43,7 @@ public class RezeroController : ControllerBase
     /// Retrieves current synchronization status and plugin configuration info.
     /// </summary>
     [HttpGet("Status")]
-    [Authorize(Policy = "DefaultAuthorization")]
+    [Authorize]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public ActionResult<object> GetStatus()
     {
@@ -90,7 +91,7 @@ public class RezeroController : ControllerBase
     /// Fetches the latest release updates directly from the official upstream API.
     /// </summary>
     [HttpGet("Updates")]
-    [Authorize(Policy = "DefaultAuthorization")]
+    [Authorize]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<object>> GetUpdates(CancellationToken cancellationToken)
     {
@@ -102,7 +103,7 @@ public class RezeroController : ControllerBase
     /// Fetches native 1080p MP4 download and BitTorrent manifest information from rezeroperfect.run.
     /// </summary>
     [HttpGet("Downloads")]
-    [Authorize(Policy = "DefaultAuthorization")]
+    [Authorize]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<object>> GetDownloadsCatalog(CancellationToken cancellationToken)
     {
@@ -123,7 +124,7 @@ public class RezeroController : ControllerBase
     /// Triggers an immediate synchronization run (optionally using transient overrides without mutating saved settings).
     /// </summary>
     [HttpPost("Sync")]
-    [Authorize(Policy = "RequiresElevation")]
+    [Authorize(Policy = Policies.RequiresElevation)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<object>> TriggerSync(

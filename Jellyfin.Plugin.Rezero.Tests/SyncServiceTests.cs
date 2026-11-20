@@ -88,9 +88,10 @@ public class SyncServiceTests
             .Returns((EpisodeDto ep, ArcDto arc, string lang, string cap, string quality, string format) =>
             {
                 var tag = cap == "cc" ? $"{lang.ToUpperInvariant()}%20BURNED%20CC" : lang.ToUpperInvariant();
-                if (format == "hls_m3u8")
+                if (format != null && format.StartsWith("hls", StringComparison.OrdinalIgnoreCase))
                 {
-                    return $"https://media.rezeroperfect.run/HLS/ARC%20{arc.Number:D2}/EP%20{ep.Number}/{quality}/ARC%20{arc.Number:D2}%20-%20EP%20{ep.Number}%20-%20{tag}/index.m3u8";
+                    var q = format == "hls_auto" ? "auto" : quality;
+                    return $"https://media.rezeroperfect.run/HLS/ARC%20{arc.Number:D2}/EP%20{ep.Number}/{q}/ARC%20{arc.Number:D2}%20-%20EP%20{ep.Number}%20-%20{tag}/index.m3u8";
                 }
 
                 return $"https://media.rezeroperfect.run/downloads/ARC%20{arc.Number:D2}/EP%20{ep.Number}/ARC%20{arc.Number:D2}%20-%20EP%20{ep.Number}%20-%20{tag}.mp4";
@@ -153,13 +154,16 @@ public class SyncServiceTests
             nfoFiles.Should().HaveCount(1);
 
             var strmContent = await File.ReadAllTextAsync(strmFiles[0], ct);
-            strmContent.Trim().Should().Be("https://media.rezeroperfect.run/downloads/ARC%2001/EP%201/ARC%2001%20-%20EP%201%20-%20JP%20BURNED%20CC.mp4");
+            strmContent.Trim().Should().Be("https://media.rezeroperfect.run/HLS/ARC%2001/EP%201/auto/ARC%2001%20-%20EP%201%20-%20JP%20BURNED%20CC/index.m3u8");
 
             var nfoContent = await File.ReadAllTextAsync(nfoFiles[0], ct);
             nfoContent.Should().Contain("<intro>");
             nfoContent.Should().Contain("<start>60</start>");
             nfoContent.Should().Contain("<outro>");
             nfoContent.Should().Contain("<end>1290</end>");
+            nfoContent.Should().Contain("<streamdetails>");
+            nfoContent.Should().Contain("<language>jpn</language>");
+            nfoContent.Should().Contain("<subtitle>");
         }
         finally
         {
