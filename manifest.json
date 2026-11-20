@@ -7,6 +7,23 @@
     "owner": "FaserF",
     "category": "Live TV & Streaming",
     "imageUrl": "https://raw.githubusercontent.com/FaserF/rezero-jellyfin/main/Jellyfin.Plugin.Rezero/thumb.png",
-    "versions": []
+    "versions": [
+      {
+        "version": "0.1.0.0",
+        "changelog": "Full Changelog:\n\n### ✨ New Features\n\n- add sequential 1080p MP4 download sync, CI fixes, and 0.1.0 release config ([c22b5e7](https://github.com/FaserF/rezero-jellyfin/commit/c22b5e7))\n- add dynamic local storage detection, symlink management, and plugin fixes ([0d35c0c](https://github.com/FaserF/rezero-jellyfin/commit/0d35c0c))\n- universal environment configuration and dynamic multi-quality media source provider (1080p, 720p, 480p) ([cabc355](https://github.com/FaserF/rezero-jellyfin/commit/cabc355))\n- initial commit for Jellyfin Re:Zero Perfect Run plugin ([42d3917](https://github.com/FaserF/rezero-jellyfin/commit/42d3917))",
+        "targetAbi": "10.10.0.0",
+        "sourceUrl": "https://github.com/FaserF/rezero-jellyfin/releases/download/v0.1.0-beta/rezero.zip",
+        "checksum": "b1c2e5192324377e7e73a055033b6500",
+        "timestamp": "2026-11-20T17:48:03Z"
+      },
+      {
+        "version": "0.1.0.0",
+        "changelog": "Full Changelog:\n\n### ✨ New Features\n\n- add sequential 1080p MP4 download sync, CI fixes, and 0.1.0 release config ([c22b5e7](https://github.com/FaserF/rezero-jellyfin/commit/c22b5e7))\n- add dynamic local storage detection, symlink management, and plugin fixes ([0d35c0c](https://github.com/FaserF/rezero-jellyfin/commit/0d35c0c))\n- universal environment configuration and dynamic multi-quality media source provider (1080p, 720p, 480p) ([cabc355](https://github.com/FaserF/rezero-jellyfin/commit/cabc355))\n- initial commit for Jellyfin Re:Zero Perfect Run plugin ([42d3917](https://github.com/FaserF/rezero-jellyfin/commit/42d3917))",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/FaserF/rezero-jellyfin/releases/download/v0.1.0-beta/rezero.zip",
+        "checksum": "b1c2e5192324377e7e73a055033b6500",
+        "timestamp": "2026-11-20T17:48:03Z"
+      }
+    ]
   }
 ]
