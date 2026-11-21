@@ -99,8 +99,13 @@ jobs:
             else
               PATCH=$((PATCH + 1))
             fi
-            DISPLAY_VER="${MAJOR}.${MINOR}.${PATCH}.${BUILD}"
-            ASSEMBLY_VERSION="$DISPLAY_VER"
+            DOTS=$(printf '%s' "$CLEAN_VER" | tr -cd '.' | wc -c)
+            if [ "$DOTS" -eq 2 ]; then
+              DISPLAY_VER="${MAJOR}.${MINOR}.${PATCH}"
+            else
+              DISPLAY_VER="${MAJOR}.${MINOR}.${PATCH}.${BUILD}"
+            fi
+            ASSEMBLY_VERSION="${MAJOR}.${MINOR}.${PATCH}.${BUILD}"
           else
             DISPLAY_VER="0.1.0"
             ASSEMBLY_VERSION="0.1.0.0"
