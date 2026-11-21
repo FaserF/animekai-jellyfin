@@ -194,7 +194,8 @@ internal static class AnimeStorageLinker
             new XElement("showtitle", title),
             new XElement("plot", plot),
             new XElement("studio", studio ?? "Anime Kai & Fan-Edits"),
-            new XElement("status", "Continuing")
+            new XElement("status", "Continuing"),
+            new XElement("lockdata", "true")
         };
 
         if (genres != null)
@@ -211,7 +212,7 @@ internal static class AnimeStorageLinker
             elements.Add(new XElement("genre", "Action"));
         }
 
-        if (!string.IsNullOrWhiteSpace(posterUrl))
+        if (IsValidImageUrl(posterUrl))
         {
             elements.Add(new XElement("thumb", new XAttribute("aspect", "poster"), posterUrl));
         }
@@ -262,7 +263,8 @@ internal static class AnimeStorageLinker
             new XElement("showtitle", showTitle),
             new XElement("season", seasonNumber),
             new XElement("episode", episodeNumber),
-            new XElement("plot", plot ?? string.Empty)
+            new XElement("plot", plot ?? string.Empty),
+            new XElement("lockdata", "true")
         };
 
         if (!string.IsNullOrWhiteSpace(mangaChapters))
@@ -270,7 +272,7 @@ internal static class AnimeStorageLinker
             elements.Add(new XElement("tag", $"Manga Chapters: {mangaChapters}"));
         }
 
-        if (!string.IsNullOrWhiteSpace(thumbUrl))
+        if (IsValidImageUrl(thumbUrl))
         {
             elements.Add(new XElement("thumb", thumbUrl));
         }
@@ -321,5 +323,31 @@ internal static class AnimeStorageLinker
         {
             return false;
         }
+    }
+
+    private static bool IsValidImageUrl(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return false;
+        }
+
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+        {
+            return false;
+        }
+
+        if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
+        {
+            return false;
+        }
+
+        if (url.Contains("archive.org/download/") ||
+            url.Contains("onepace.net/images/"))
+        {
+            return false;
+        }
+
+        return true;
     }
 }

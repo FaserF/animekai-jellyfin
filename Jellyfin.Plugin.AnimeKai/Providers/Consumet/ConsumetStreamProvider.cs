@@ -131,6 +131,12 @@ public class ConsumetStreamProvider : IAnimeStreamProvider
         }
 
         var baseUrl = EnsureTrailingSlash(config.ConsumetApiUrl);
+        if (string.IsNullOrWhiteSpace(config.ConsumetApiUrl) || baseUrl.Contains("api.consumet.org", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogInformation("Consumet HLS Gateway requires a self-hosted or custom private API server; public api.consumet.org is decommissioned. Skipping sync.");
+            return new ProviderSyncResult(ProviderId, DisplayName, true, 0, "Consumet skipped: requires a configured private or self-hosted API instance.");
+        }
+
         var provider = string.IsNullOrWhiteSpace(config.ConsumetProvider) ? "gogoanime" : config.ConsumetProvider.ToLowerInvariant();
         var targetBaseDir = ResolveTargetDirectory(config, context.StorageRoot);
         var physicalBaseDir = Path.Combine(context.StorageRoot, "Streams");
@@ -147,7 +153,14 @@ public class ConsumetStreamProvider : IAnimeStreamProvider
                 var response = await _httpClient.GetAsync(infoUrl, cancellationToken).ConfigureAwait(false);
                 if (!response.IsSuccessStatusCode)
                 {
-                    _logger.LogWarning("Consumet info returned {Status} for {Slug} at {Url}", response.StatusCode, showSlug, infoUrl);
+                    _logger.LogInformation("Consumet info returned {Status} for {Slug} at {Url}", response.StatusCode, showSlug, infoUrl);
+                    continue;
+                }
+
+                var contentType = response.Content.Headers.ContentType?.MediaType;
+                if (contentType != null && !contentType.Contains("json", StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.LogInformation("Consumet API at {Url} returned non-JSON content type ({ContentType}). Skipping.", infoUrl, contentType);
                     continue;
                 }
 
@@ -233,7 +246,7 @@ public class ConsumetStreamProvider : IAnimeStreamProvider
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Could not sync Consumet anime {Show}", showSlug);
+                _logger.LogInformation(ex, "Could not sync Consumet anime {Show} from {Url}", showSlug, baseUrl);
             }
 
             progress?.Report((double)(i + 1) / shows.Length * 100.0);

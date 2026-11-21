@@ -70,7 +70,7 @@ public class BleachKaiStreamProvider : IAnimeStreamProvider
                 "BLEACH (Bleach Kai)",
                 new[] { "Animation", "Anime", "Action", "Supernatural", "Swordplay" },
                 "Bleach Kai Team",
-                "https://archive.org/download/bleach-kai-posters/bleach_kai_poster.jpg");
+                null);
             await File.WriteAllTextAsync(tvshowNfo, content, cancellationToken).ConfigureAwait(false);
             if (!string.Equals(physicalShowDir, showDir, StringComparison.OrdinalIgnoreCase))
             {
@@ -110,7 +110,7 @@ public class BleachKaiStreamProvider : IAnimeStreamProvider
                 1,
                 vol.VolumeNumber,
                 vol.Plot,
-                $"https://archive.org/download/bleach-kai-covers/vol_{vol.VolumeNumber:D2}.jpg",
+                null,
                 isDub ? "eng" : "jpn",
                 !isDub,
                 mangaChapters: vol.Chapters);

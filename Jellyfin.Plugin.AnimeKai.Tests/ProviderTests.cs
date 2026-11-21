@@ -172,6 +172,66 @@ public class ProviderTests
     }
 
     [Fact]
+    public void OnePaceStreamProvider_ParseWatchPage_ShouldExtractArcsAndEpisodesFromNextJsHtml()
+    {
+        var sampleHtml = """
+        <li data-timeline-segment="romance-dawn">
+            <h2>Romance Dawn</h2>
+            <p>Luffy sets out on his journey to become King of the Pirates.</p>
+            <h3>01: ROMANCE DAWN, ~The Dawn of an Adventure~</h3>
+            <span>English Subtitles</span>
+            <a href="https://pixeldrain.net/u/RwHyfKZs">Pixeldrain: 480p</a>
+            <a href="https://pixeldrain.net/u/cbjgKSRu">Pixeldrain: 1080p</a>
+            <span>English Dub</span>
+            <a href="https://pixeldrain.net/u/gpR8Tf9E">Pixeldrain: 1080p</a>
+            <h3>02: They Call Him "Straw Hat" Luffy</h3>
+            <span>English Subtitles</span>
+            <a href="https://pixeldrain.net/u/wxsv8FWy">Pixeldrain: 1080p</a>
+        </li>
+        """;
+
+        var catalog = OnePaceStreamProvider.ParseWatchPage(sampleHtml, new Uri("https://onepace.net/en/watch"));
+        catalog.Should().HaveCount(1);
+
+        var arc = catalog[0];
+        arc.Slug.Should().Be("romance-dawn");
+        arc.Title.Should().Be("Romance Dawn");
+        arc.Episodes.Should().HaveCount(2);
+
+        var ep1 = arc.Episodes[0];
+        ep1.Number.Should().Be(1);
+        ep1.Title.Should().Be("ROMANCE DAWN, ~The Dawn of an Adventure~");
+        ep1.Sources.Should().HaveCount(3);
+        ep1.Sources.Any(s => s.Language == OnePaceLanguage.Sub && s.Quality == 1080 && s.FileId == "cbjgKSRu").Should().BeTrue();
+        ep1.Sources.Any(s => s.Language == OnePaceLanguage.Dub && s.Quality == 1080 && s.FileId == "gpR8Tf9E").Should().BeTrue();
+    }
+
+    [Fact]
+    public void AnimeStorageLinker_NfoShouldIncludeLockDataAndSuppressInvalidImages()
+    {
+        var showNfo = Jellyfin.Plugin.AnimeKai.Services.AnimeStorageLinker.BuildTvShowNfo(
+            "Bleach Kai",
+            "Manga canon edit.",
+            posterUrl: "https://archive.org/download/bleach-kai-posters/bleach_kai_poster.jpg");
+
+        showNfo.Should().Contain("<lockdata>true</lockdata>");
+        showNfo.Should().NotContain("archive.org/download");
+        showNfo.Should().NotContain("<thumb");
+
+        var epNfo = Jellyfin.Plugin.AnimeKai.Services.AnimeStorageLinker.BuildEpisodeNfo(
+            "Vol 01",
+            "Bleach Kai",
+            1,
+            1,
+            "Episode plot.",
+            thumbUrl: "https://archive.org/download/bleach-kai-covers/vol_01.jpg");
+
+        epNfo.Should().Contain("<lockdata>true</lockdata>");
+        epNfo.Should().NotContain("archive.org/download");
+        epNfo.Should().NotContain("<thumb");
+    }
+
+    [Fact]
     public async Task ConsumetStreamProvider_MockServer_ShouldSyncAnimeEpisodes()
     {
         var ct = TestContext.Current.CancellationToken;

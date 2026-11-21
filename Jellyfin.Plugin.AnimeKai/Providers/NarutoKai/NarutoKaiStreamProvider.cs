@@ -70,7 +70,7 @@ public class NarutoKaiStreamProvider : IAnimeStreamProvider
                 "NARUTO (Naruto Kai)",
                 new[] { "Animation", "Anime", "Action", "Adventure", "Martial Arts", "Fantasy" },
                 "Naruto Kai Team",
-                "https://archive.org/download/naruto-kai-posters/naruto_kai_poster.jpg");
+                null);
             await File.WriteAllTextAsync(tvshowNfo, content, cancellationToken).ConfigureAwait(false);
             if (!string.Equals(physicalShowDir, showDir, StringComparison.OrdinalIgnoreCase))
             {
@@ -110,7 +110,7 @@ public class NarutoKaiStreamProvider : IAnimeStreamProvider
                 1,
                 vol.VolumeNumber,
                 vol.Plot,
-                $"https://archive.org/download/naruto-kai-covers/vol_{vol.VolumeNumber:D2}.jpg",
+                null,
                 isDub ? "eng" : "jpn",
                 !isDub,
                 mangaChapters: vol.Chapters);
