@@ -187,25 +187,7 @@ public class BleachKaiStreamProvider : IAnimeStreamProvider
     }
 
     private string ResolveShowDirectory(PluginConfiguration config, string storageRoot)
-    {
-        if (!string.IsNullOrWhiteSpace(config.BleachKaiTargetLibraryPath) && Directory.Exists(config.BleachKaiTargetLibraryPath))
-        {
-            var path = config.BleachKaiTargetLibraryPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            return path.EndsWith("Bleach Kai", StringComparison.OrdinalIgnoreCase) ? path : Path.Combine(path, "Bleach Kai");
-        }
-
-        var virtualFolders = _libraryManager.GetVirtualFolders() ?? new List<VirtualFolderInfo>();
-        var tvFolders = virtualFolders.Where(f => string.Equals(f.CollectionType?.ToString(), "tvshows", StringComparison.OrdinalIgnoreCase)).SelectMany(f => f.Locations).ToList();
-        foreach (var folder in tvFolders)
-        {
-            if (Directory.Exists(folder))
-            {
-                return Path.Combine(folder, "Bleach Kai");
-            }
-        }
-
-        return Path.Combine(storageRoot, "BleachKai");
-    }
+        => AnimeStorageLinker.ResolveShowDirectory(config, _libraryManager, "Bleach Kai", config.BleachKaiTargetLibraryPath, storageRoot, "BleachKai");
 
     private static string Sanitize(string name)
     {

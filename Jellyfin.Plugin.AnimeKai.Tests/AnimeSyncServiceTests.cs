@@ -105,8 +105,9 @@ public class AnimeSyncServiceTests
             var content = await File.ReadAllTextAsync(strmFiles[0], ct);
             content.Should().Contain("/HLS/ARC%2001/EP%201/");
 
-            var nfoFiles = Directory.GetFiles(seasonDir, "*.nfo");
-            nfoFiles.Should().HaveCount(1);
+            var epNfoFiles = Directory.GetFiles(seasonDir, "*S00E*.nfo");
+            epNfoFiles.Should().HaveCount(1);
+            File.Exists(Path.Combine(seasonDir, "season.nfo")).Should().BeTrue();
         }
         finally
         {

@@ -19,6 +19,12 @@ public class PluginConfiguration : BasePluginConfiguration
     public string DedicatedStoragePath { get; set; } = string.Empty;
 
     /// <summary>
+    /// Gets or sets the global default target TV library root folder (e.g. /data/tv on Google Drive / MergerFS pool)
+    /// where all active providers create show directories and symlinks. Leave blank to auto-detect the primary TV library.
+    /// </summary>
+    public string DefaultTargetLibraryPath { get; set; } = string.Empty;
+
+    /// <summary>
     /// Gets or sets a value indicating whether dedicated local storage with symlinks is enabled.
     /// </summary>
     public bool EnableSymlink { get; set; } = true;

@@ -82,6 +82,18 @@ public class RezeroStreamProvider : IAnimeStreamProvider
             context.UseSymlink,
             _logger);
 
+        // Lock season.nfo so TVDB never maps Season 00 episodes to Break Time specials
+        var seasonNfo = Path.Combine(writeDir, "season.nfo");
+        var seasonNfoContent = AnimeStorageLinker.BuildSeasonNfo(
+            "Re:Zero - The Perfect Run",
+            config.SeasonNumber,
+            "Chronological narrative fan re-cut of Re:Zero - Starting Life in Another World (Arcs 1-6).");
+        await AnimeStorageLinker.WriteIfChangedAsync(seasonNfo, seasonNfoContent, cancellationToken).ConfigureAwait(false);
+        if (!string.IsNullOrWhiteSpace(perFileSymlinkDir))
+        {
+            AnimeStorageLinker.EnsureFileSymlink(Path.Combine(perFileSymlinkDir, "season.nfo"), seasonNfo, _logger);
+        }
+
         // tvshow.nfo if standalone
         if (string.Equals(config.IntegrationMode, "StandaloneSeries", StringComparison.OrdinalIgnoreCase))
         {
@@ -174,6 +186,8 @@ public class RezeroStreamProvider : IAnimeStreamProvider
 
             progress?.Report((double)(i + 1) / videosResponse.Arcs.Count * 100.0);
         }
+
+        await AnimeStorageLinker.SanitizeSpecialsPlacementAsync(_libraryManager, targetSeasonDir, physicalSeasonDir, _logger, cancellationToken).ConfigureAwait(false);
 
         _logger.LogInformation("Re:Zero sync completed: {Count} episodes.", total);
         return new ProviderSyncResult(ProviderId, DisplayName, true, total, $"Synchronized {total} Re:Zero episodes.");
@@ -390,9 +404,25 @@ public class RezeroStreamProvider : IAnimeStreamProvider
 
     private string ResolveShowDirectory(PluginConfiguration config, string storageRoot)
     {
+        if (string.Equals(config.IntegrationMode, "StandaloneSeries", StringComparison.OrdinalIgnoreCase))
+        {
+            var title = string.IsNullOrWhiteSpace(config.StandaloneSeriesTitle) ? "ReZero - The Perfect Run" : Sanitize(config.StandaloneSeriesTitle);
+            return AnimeStorageLinker.ResolveShowDirectory(config, _libraryManager, title, config.StandaloneLibraryPath, storageRoot, "ReZero");
+        }
+
         if (!string.IsNullOrWhiteSpace(config.TargetSeriesPath) && Directory.Exists(config.TargetSeriesPath))
         {
             return config.TargetSeriesPath;
+        }
+
+        var primaryRoot = AnimeStorageLinker.ResolveTargetTvLibraryRoot(config, _libraryManager);
+        if (!string.IsNullOrWhiteSpace(primaryRoot) && Directory.Exists(primaryRoot))
+        {
+            var primaryCandidates = Directory.GetDirectories(primaryRoot, "*Re*ZERO*", SearchOption.TopDirectoryOnly);
+            if (primaryCandidates.Length > 0)
+            {
+                return primaryCandidates[0];
+            }
         }
 
         var virtualFolders = _libraryManager.GetVirtualFolders() ?? new List<VirtualFolderInfo>();

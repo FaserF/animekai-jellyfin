@@ -187,25 +187,7 @@ public class NarutoKaiStreamProvider : IAnimeStreamProvider
     }
 
     private string ResolveShowDirectory(PluginConfiguration config, string storageRoot)
-    {
-        if (!string.IsNullOrWhiteSpace(config.NarutoKaiTargetLibraryPath) && Directory.Exists(config.NarutoKaiTargetLibraryPath))
-        {
-            var path = config.NarutoKaiTargetLibraryPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            return path.EndsWith("Naruto Kai", StringComparison.OrdinalIgnoreCase) ? path : Path.Combine(path, "Naruto Kai");
-        }
-
-        var virtualFolders = _libraryManager.GetVirtualFolders() ?? new List<VirtualFolderInfo>();
-        var tvFolders = virtualFolders.Where(f => string.Equals(f.CollectionType?.ToString(), "tvshows", StringComparison.OrdinalIgnoreCase)).SelectMany(f => f.Locations).ToList();
-        foreach (var folder in tvFolders)
-        {
-            if (Directory.Exists(folder))
-            {
-                return Path.Combine(folder, "Naruto Kai");
-            }
-        }
-
-        return Path.Combine(storageRoot, "NarutoKai");
-    }
+        => AnimeStorageLinker.ResolveShowDirectory(config, _libraryManager, "Naruto Kai", config.NarutoKaiTargetLibraryPath, storageRoot, "NarutoKai");
 
     private static string Sanitize(string name)
     {

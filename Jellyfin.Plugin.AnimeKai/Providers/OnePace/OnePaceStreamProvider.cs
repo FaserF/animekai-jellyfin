@@ -407,26 +407,7 @@ public class OnePaceStreamProvider : IAnimeStreamProvider
     }
 
     private string ResolveShowDirectory(PluginConfiguration config, string storageRoot)
-    {
-        if (!string.IsNullOrWhiteSpace(config.OnePaceTargetLibraryPath) && Directory.Exists(config.OnePaceTargetLibraryPath))
-        {
-            var path = config.OnePaceTargetLibraryPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            return path.EndsWith("One Pace", StringComparison.OrdinalIgnoreCase) ? path : Path.Combine(path, "One Pace");
-        }
-
-        // Auto-detect existing One Piece or TV shows folder
-        var virtualFolders = _libraryManager.GetVirtualFolders() ?? new List<VirtualFolderInfo>();
-        var tvFolders = virtualFolders.Where(f => string.Equals(f.CollectionType?.ToString(), "tvshows", StringComparison.OrdinalIgnoreCase)).SelectMany(f => f.Locations).ToList();
-        foreach (var folder in tvFolders)
-        {
-            if (Directory.Exists(folder))
-            {
-                return Path.Combine(folder, "One Pace");
-            }
-        }
-
-        return Path.Combine(storageRoot, "OnePace");
-    }
+        => AnimeStorageLinker.ResolveShowDirectory(config, _libraryManager, "One Pace", config.OnePaceTargetLibraryPath, storageRoot, "OnePace");
 
     private static string Sanitize(string name)
     {

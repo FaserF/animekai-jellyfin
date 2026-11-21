@@ -6,6 +6,12 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
+using Jellyfin.Data.Enums;
+using Jellyfin.Plugin.AnimeKai.Configuration;
+using MediaBrowser.Controller.Entities;
+using MediaBrowser.Controller.Entities.TV;
+using MediaBrowser.Controller.Library;
+using MediaBrowser.Model.Entities;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.AnimeKai.Services;
@@ -16,6 +22,104 @@ namespace Jellyfin.Plugin.AnimeKai.Services;
 internal static class AnimeStorageLinker
 {
     private static readonly Encoding Utf8WithoutBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+
+    internal static string? ResolveTargetTvLibraryRoot(
+        PluginConfiguration config,
+        ILibraryManager libraryManager,
+        string? providerOverridePath = null)
+    {
+        if (!string.IsNullOrWhiteSpace(providerOverridePath) && Directory.Exists(providerOverridePath))
+        {
+            return providerOverridePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        }
+
+        if (!string.IsNullOrWhiteSpace(config.DefaultTargetLibraryPath) && Directory.Exists(config.DefaultTargetLibraryPath))
+        {
+            return config.DefaultTargetLibraryPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        }
+
+        var virtualFolders = libraryManager.GetVirtualFolders() ?? new List<VirtualFolderInfo>();
+        var candidates = new List<(string Path, int Score)>();
+
+        foreach (var vf in virtualFolders)
+        {
+            if (!string.Equals(vf.CollectionType?.ToString(), "tvshows", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var vfName = vf.Name ?? string.Empty;
+            foreach (var loc in vf.Locations ?? Array.Empty<string>())
+            {
+                if (string.IsNullOrWhiteSpace(loc) || !Directory.Exists(loc))
+                {
+                    continue;
+                }
+
+                var score = 0;
+                if (string.Equals(loc, "/data/tv", StringComparison.OrdinalIgnoreCase))
+                {
+                    score += 100;
+                }
+
+                if (string.Equals(vfName, "Serien", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(vfName, "TV Shows", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(vfName, "Anime", StringComparison.OrdinalIgnoreCase))
+                {
+                    score += 50;
+                }
+
+                if (loc.Contains("emby", StringComparison.OrdinalIgnoreCase) ||
+                    vfName.Contains("emby", StringComparison.OrdinalIgnoreCase) ||
+                    loc.Contains("mediathek", StringComparison.OrdinalIgnoreCase) ||
+                    loc.Contains("youtube", StringComparison.OrdinalIgnoreCase))
+                {
+                    score -= 80;
+                }
+
+                try
+                {
+                    if (Directory.GetDirectories(loc, "*Re*ZERO*", SearchOption.TopDirectoryOnly).Length > 0)
+                    {
+                        score += 40;
+                    }
+                }
+                catch
+                {
+                    // Ignore directory enumeration errors
+                }
+
+                candidates.Add((loc.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar), score));
+            }
+        }
+
+        return candidates.OrderByDescending(c => c.Score).Select(c => c.Path).FirstOrDefault();
+    }
+
+    internal static string ResolveShowDirectory(
+        PluginConfiguration config,
+        ILibraryManager libraryManager,
+        string showFolderName,
+        string? providerOverridePath,
+        string storageRoot,
+        string physicalSubfolder)
+    {
+        if (!string.IsNullOrWhiteSpace(providerOverridePath) && Directory.Exists(providerOverridePath))
+        {
+            var trimmed = providerOverridePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            return trimmed.EndsWith(showFolderName, StringComparison.OrdinalIgnoreCase)
+                ? trimmed
+                : Path.Combine(trimmed, showFolderName);
+        }
+
+        var libRoot = ResolveTargetTvLibraryRoot(config, libraryManager);
+        if (!string.IsNullOrWhiteSpace(libRoot))
+        {
+            return Path.Combine(libRoot, showFolderName);
+        }
+
+        return Path.Combine(storageRoot, physicalSubfolder);
+    }
     internal static (string WriteDir, string? PerFileSymlinkDir) EnsureStorageLayout(
         string targetDir,
         string physicalDir,
@@ -306,6 +410,7 @@ internal static class AnimeStorageLinker
         var elements = new List<object>
         {
             new XElement("title", title),
+            new XElement("originaltitle", title),
             new XElement("showtitle", showTitle),
             new XElement("season", seasonNumber),
             new XElement("episode", episodeNumber),
@@ -344,6 +449,83 @@ internal static class AnimeStorageLinker
             new XElement("episodedetails", elements));
 
         return doc.Declaration + Environment.NewLine + doc;
+    }
+
+    internal static string BuildSeasonNfo(string title, int seasonNumber, string? plot = null)
+    {
+        var doc = new XDocument(
+            new XDeclaration("1.0", "utf-8", "yes"),
+            new XElement("season",
+                new XElement("title", title),
+                new XElement("seasonnumber", seasonNumber),
+                new XElement("plot", plot ?? string.Empty),
+                new XElement("lockdata", "true")));
+        return doc.Declaration + Environment.NewLine + doc;
+    }
+
+    internal static async Task SanitizeSpecialsPlacementAsync(
+        ILibraryManager libraryManager,
+        string targetSeasonDir,
+        string physicalSeasonDir,
+        ILogger logger,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var items = libraryManager.GetItemList(new InternalItemsQuery
+            {
+                IncludeItemTypes = new[] { BaseItemKind.Episode },
+                Recursive = true
+            });
+
+            if (items == null || items.Count == 0)
+            {
+                return;
+            }
+
+            var cleaned = 0;
+            foreach (var baseItem in items)
+            {
+                if (baseItem is not Episode ep || string.IsNullOrWhiteSpace(ep.Path))
+                {
+                    continue;
+                }
+
+                var isTargetSpecial = ep.Path.StartsWith(targetSeasonDir, StringComparison.OrdinalIgnoreCase) ||
+                                      ep.Path.StartsWith(physicalSeasonDir, StringComparison.OrdinalIgnoreCase) ||
+                                      (ep.ParentIndexNumber == 0 && ep.Path.Contains("[Arc ", StringComparison.OrdinalIgnoreCase));
+
+                if (!isTargetSpecial)
+                {
+                    continue;
+                }
+
+                if (ep.AirsBeforeSeasonNumber.HasValue ||
+                    ep.AirsAfterSeasonNumber.HasValue ||
+                    ep.AirsBeforeEpisodeNumber.HasValue ||
+                    !ep.IsLocked ||
+                    (ep.ProviderIds != null && ep.ProviderIds.Count > 0))
+                {
+                    ep.AirsBeforeSeasonNumber = null;
+                    ep.AirsAfterSeasonNumber = null;
+                    ep.AirsBeforeEpisodeNumber = null;
+                    ep.OriginalTitle = ep.Name;
+                    ep.ProviderIds?.Clear();
+                    ep.IsLocked = true;
+                    await libraryManager.UpdateItemAsync(ep, ep.GetParent(), ItemUpdateType.MetadataEdit, cancellationToken).ConfigureAwait(false);
+                    cleaned++;
+                }
+            }
+
+            if (cleaned > 0)
+            {
+                logger.LogInformation("Sanitized {Count} Season 00 episodes (removed TVDB mid-season injection flags and locked metadata).", cleaned);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Could not sanitize Season 00 specials placement in Jellyfin database.");
+        }
     }
 
     private static bool IsGeneratedPointerOrNfo(string path)

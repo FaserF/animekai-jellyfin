@@ -28,6 +28,7 @@ public class AnimeController : ControllerBase
     private readonly IAnimeSyncService _syncService;
     private readonly IEnumerable<IAnimeStreamProvider> _providers;
     private readonly IRezeroApiClient _rezeroApiClient;
+    private readonly MediaBrowser.Controller.Library.ILibraryManager _libraryManager;
     private readonly ILogger<AnimeController> _logger;
 
     /// <summary>
@@ -37,11 +38,13 @@ public class AnimeController : ControllerBase
         IAnimeSyncService syncService,
         IEnumerable<IAnimeStreamProvider> providers,
         IRezeroApiClient rezeroApiClient,
+        MediaBrowser.Controller.Library.ILibraryManager libraryManager,
         ILogger<AnimeController> logger)
     {
         _syncService = syncService;
         _providers = providers;
         _rezeroApiClient = rezeroApiClient;
+        _libraryManager = libraryManager;
         _logger = logger;
     }
 
@@ -56,13 +59,34 @@ public class AnimeController : ControllerBase
     public ActionResult<object> GetStatus()
     {
         var storageRoot = _syncService.ResolveDedicatedStorageRoot();
+        var targetLibraryRoot = AnimeStorageLinker.ResolveTargetTvLibraryRoot(Config, _libraryManager) ?? storageRoot;
         var isSymlinkActive = false;
         try
         {
-            var rezeroTarget = Path.Combine(storageRoot, "ReZero", Config.SeasonFolder);
-            if (Directory.Exists(rezeroTarget))
+            var probeTargets = new[]
             {
-                isSymlinkActive = !string.IsNullOrEmpty(new DirectoryInfo(rezeroTarget).LinkTarget);
+                Path.Combine(targetLibraryRoot, "One Pace", "Season 01"),
+                Path.Combine(targetLibraryRoot, "Naruto Kai", "Season 01"),
+                Path.Combine(targetLibraryRoot, "Bleach Kai", "Season 01"),
+                Path.Combine(storageRoot, "ReZero", Config.SeasonFolder)
+            };
+
+            if (Directory.Exists(targetLibraryRoot))
+            {
+                foreach (var rzDir in Directory.GetDirectories(targetLibraryRoot, "*Re*ZERO*", SearchOption.TopDirectoryOnly))
+                {
+                    var rzSeason = Path.Combine(rzDir, Config.SeasonFolder);
+                    if (Directory.Exists(rzSeason) && !string.IsNullOrEmpty(new DirectoryInfo(rzSeason).LinkTarget))
+                    {
+                        isSymlinkActive = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!isSymlinkActive)
+            {
+                isSymlinkActive = probeTargets.Any(p => Directory.Exists(p) && !string.IsNullOrEmpty(new DirectoryInfo(p).LinkTarget));
             }
         }
         catch
@@ -81,6 +105,8 @@ public class AnimeController : ControllerBase
         {
             StorageRoot = storageRoot,
             DedicatedStoragePath = Config.DedicatedStoragePath,
+            DefaultTargetLibraryPath = Config.DefaultTargetLibraryPath,
+            ResolvedTargetLibraryPath = targetLibraryRoot,
             EnableSymlink = Config.EnableSymlink,
             IsSymlinkActive = isSymlinkActive,
             EnableAutoSync = Config.EnableAutoSync,

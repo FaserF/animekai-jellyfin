@@ -302,14 +302,10 @@ public class ConsumetStreamProvider : IAnimeStreamProvider
             return dedicatedDir;
         }
 
-        var virtualFolders = _libraryManager.GetVirtualFolders() ?? new List<VirtualFolderInfo>();
-        var tvFolders = virtualFolders.Where(f => string.Equals(f.CollectionType?.ToString(), "tvshows", StringComparison.OrdinalIgnoreCase)).SelectMany(f => f.Locations).ToList();
-        foreach (var folder in tvFolders)
+        var primaryRoot = AnimeStorageLinker.ResolveTargetTvLibraryRoot(config, _libraryManager);
+        if (!string.IsNullOrWhiteSpace(primaryRoot))
         {
-            if (Directory.Exists(folder))
-            {
-                return folder;
-            }
+            return primaryRoot;
         }
 
         var fallbackDir = Path.Combine(storageRoot, "Consumet");

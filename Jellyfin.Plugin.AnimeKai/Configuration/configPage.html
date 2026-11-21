@@ -63,9 +63,15 @@
                         </div>
 
                         <div class="inputContainer" id="containerDedicatedStorage">
-                            <label class="inputLabel inputLabelUnfocused" for="txtDedicatedStoragePath">Dedicated Storage Path (Optional)</label>
+                            <label class="inputLabel inputLabelUnfocused" for="txtDedicatedStoragePath">Dedicated Physical Storage Path (Optional)</label>
                             <input is="emby-input" type="text" id="txtDedicatedStoragePath" name="DedicatedStoragePath" class="emby-input" placeholder="/data/animekai" />
-                            <div class="fieldDescription">Custom directory for physical .strm / episode storage. Leave blank for auto-detection.</div>
+                            <div class="fieldDescription">Fast local NVMe/SSD directory where physical .strm and .nfo files are stored (default: /data/animekai).</div>
+                        </div>
+
+                        <div class="inputContainer" id="containerDefaultTargetLibrary">
+                            <label class="inputLabel inputLabelUnfocused" for="txtDefaultTargetLibraryPath">Global Target TV Library Path (GDrive Pool / Primary TV Folder)</label>
+                            <input is="emby-input" type="text" id="txtDefaultTargetLibraryPath" name="DefaultTargetLibraryPath" class="emby-input" placeholder="/data/tv" />
+                            <div class="fieldDescription">Global target TV library root (e.g. /data/tv on your Google Drive / MergerFS pool) where all enabled providers (Re:Zero, One Pace, Naruto Kai, Bleach Kai) create their show folders and symlinks. Leave blank to auto-detect your primary "Serien" / "TV Shows" library.</div>
                         </div>
                     </div>
 
@@ -113,7 +119,8 @@
                             <div class="selectContainer">
                                 <label class="selectLabel" for="selectStreamFormat">Primary Stream URL Format</label>
                                 <select is="emby-select" id="selectStreamFormat" name="StreamFormat" class="emby-select">
-                                    <option value="hls_auto">Fast Adaptive HLS Stream (index.m3u8 &mdash; Best performance)</option>
+                                    <option value="hls_direct">Fast Direct 1080p HLS Stream (index.m3u8 &mdash; Instant start)</option>
+                                    <option value="hls_auto">Adaptive Multi-Variant HLS Master (index.m3u8)</option>
                                     <option value="direct_mp4">Direct 1080p MP4 URL (Single file stream)</option>
                                 </select>
                             </div>
@@ -157,30 +164,30 @@
                             <div class="selectContainer">
                                 <label class="selectLabel" for="selectOnePaceMode">One Pace Structure</label>
                                 <select is="emby-select" id="selectOnePaceMode" name="OnePaceIntegrationMode" class="emby-select">
-                                    <option value="IndependentShow">Independent Show ("One Pace" with Seasons 1..34 matching Arcs)</option>
-                                    <option value="Specials">Specials (Attach to existing One Piece as Season 00)</option>
+                                    <option value="StandaloneSeries">Standalone Show ("One Pace" with Seasons 1..38 matching Arcs)</option>
+                                    <option value="SpecialSeason">Specials (Attach to existing One Piece as Season 00)</option>
                                 </select>
                             </div>
 
                             <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="txtOnePaceTargetDirectory">Target Library Directory (Optional)</label>
-                                <input is="emby-input" type="text" id="txtOnePaceTargetDirectory" name="OnePaceTargetDirectory" class="emby-input" placeholder="/data/tv/One Pace" />
-                                <div class="fieldDescription">Destination folder for One Pace. Leave blank for auto-detection in anime/tv libraries.</div>
+                                <label class="inputLabel inputLabelUnfocused" for="txtOnePaceTargetDirectory">Target Library Override (Optional)</label>
+                                <input is="emby-input" type="text" id="txtOnePaceTargetDirectory" name="OnePaceTargetLibraryPath" class="emby-input" placeholder="Leave blank to use Global Target TV Library" />
+                                <div class="fieldDescription">Optional override folder for One Pace. Leave blank to use the Global Target TV Library Path (/data/tv).</div>
                             </div>
 
                             <div class="selectContainer">
                                 <label class="selectLabel" for="selectOnePaceQuality">Preferred Stream Quality</label>
                                 <select is="emby-select" id="selectOnePaceQuality" name="OnePacePreferredQuality" class="emby-select">
-                                    <option value="1080p">1080p High Definition (Default)</option>
-                                    <option value="720p">720p Standard HD</option>
+                                    <option value="1080">1080p High Definition (Default)</option>
+                                    <option value="720">720p Standard HD</option>
                                 </select>
                             </div>
 
                             <div class="selectContainer">
                                 <label class="selectLabel" for="selectOnePaceLanguage">Preferred Audio Track</label>
-                                <select is="emby-select" id="selectOnePaceLanguage" name="OnePacePreferredLanguage" class="emby-select">
-                                    <option value="jp">Japanese Audio with English Subtitles</option>
-                                    <option value="en">English Dub (where available)</option>
+                                <select is="emby-select" id="selectOnePaceLanguage" name="OnePaceLanguage" class="emby-select">
+                                    <option value="sub">Japanese Audio with English Subtitles</option>
+                                    <option value="dub">English Dub (where available)</option>
                                 </select>
                             </div>
 
@@ -206,16 +213,16 @@
 
                         <div id="sectionNarutoKaiSettings" style="display: none; padding-left: 16px; border-left: 2px solid #FF8C00; margin-top: 12px;">
                             <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="txtNarutoKaiTargetDirectory">Target Series Directory (Optional)</label>
-                                <input is="emby-input" type="text" id="txtNarutoKaiTargetDirectory" name="NarutoKaiTargetDirectory" class="emby-input" placeholder="/data/tv/Naruto Kai" />
-                                <div class="fieldDescription">Folder where Naruto Kai .strm and metadata will be placed.</div>
+                                <label class="inputLabel inputLabelUnfocused" for="txtNarutoKaiTargetDirectory">Target Library Override (Optional)</label>
+                                <input is="emby-input" type="text" id="txtNarutoKaiTargetDirectory" name="NarutoKaiTargetLibraryPath" class="emby-input" placeholder="Leave blank to use Global Target TV Library" />
+                                <div class="fieldDescription">Optional override folder for Naruto Kai. Leave blank to use the Global Target TV Library Path (/data/tv).</div>
                             </div>
 
                             <div class="selectContainer">
                                 <label class="selectLabel" for="selectNarutoKaiLanguage">Preferred Audio</label>
                                 <select is="emby-select" id="selectNarutoKaiLanguage" name="NarutoKaiLanguage" class="emby-select">
-                                    <option value="jp">Japanese with English Subtitles</option>
-                                    <option value="en">English Dub</option>
+                                    <option value="sub">Japanese with English Subtitles</option>
+                                    <option value="dub">English Dub</option>
                                 </select>
                             </div>
                         </div>
@@ -235,16 +242,16 @@
 
                         <div id="sectionBleachKaiSettings" style="display: none; padding-left: 16px; border-left: 2px solid #00BFFF; margin-top: 12px;">
                             <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="txtBleachKaiTargetDirectory">Target Series Directory (Optional)</label>
-                                <input is="emby-input" type="text" id="txtBleachKaiTargetDirectory" name="BleachKaiTargetDirectory" class="emby-input" placeholder="/data/tv/Bleach Kai" />
-                                <div class="fieldDescription">Folder where Bleach Kai .strm and metadata will be placed.</div>
+                                <label class="inputLabel inputLabelUnfocused" for="txtBleachKaiTargetDirectory">Target Library Override (Optional)</label>
+                                <input is="emby-input" type="text" id="txtBleachKaiTargetDirectory" name="BleachKaiTargetLibraryPath" class="emby-input" placeholder="Leave blank to use Global Target TV Library" />
+                                <div class="fieldDescription">Optional override folder for Bleach Kai. Leave blank to use the Global Target TV Library Path (/data/tv).</div>
                             </div>
 
                             <div class="selectContainer">
                                 <label class="selectLabel" for="selectBleachKaiLanguage">Preferred Audio</label>
                                 <select is="emby-select" id="selectBleachKaiLanguage" name="BleachKaiLanguage" class="emby-select">
-                                    <option value="jp">Japanese with English Subtitles</option>
-                                    <option value="en">English Dub</option>
+                                    <option value="sub">Japanese with English Subtitles</option>
+                                    <option value="dub">English Dub</option>
                                 </select>
                             </div>
                         </div>
@@ -344,6 +351,7 @@
                     page.querySelector("#txtSyncIntervalHours").value = config.SyncIntervalHours || 12;
                     page.querySelector("#chkEnableSymlink").checked = config.EnableSymlink !== false;
                     page.querySelector("#txtDedicatedStoragePath").value = config.DedicatedStoragePath || "";
+                    page.querySelector("#txtDefaultTargetLibraryPath").value = config.DefaultTargetLibraryPath || "";
 
                     // Re:Zero
                     page.querySelector("#chkEnableRezero").checked = config.EnableRezero === true;
@@ -351,35 +359,35 @@
                     page.querySelector("#txtTargetSeriesPath").value = config.TargetSeriesPath || "";
                     page.querySelector("#txtStandaloneLibraryPath").value = config.StandaloneLibraryPath || "";
                     page.querySelector("#selectSyncMode").value = config.SyncMode || "Stream";
-                    page.querySelector("#selectStreamFormat").value = config.StreamFormat || "hls_auto";
+                    page.querySelector("#selectStreamFormat").value = config.StreamFormat || "hls_direct";
                     page.querySelector("#selectPreferredLanguage").value = config.PreferredLanguage || "jp";
                     page.querySelector("#selectPreferredCaptions").value = config.PreferredCaptions || "cc";
                     page.querySelector("#txtApiBaseUrl").value = config.ApiBaseUrl || "https://rezeroperfect.run/";
 
                     // One Pace
                     page.querySelector("#chkEnableOnePace").checked = config.EnableOnePace === true;
-                    page.querySelector("#selectOnePaceMode").value = config.OnePaceIntegrationMode || "IndependentShow";
-                    page.querySelector("#txtOnePaceTargetDirectory").value = config.OnePaceTargetDirectory || "";
-                    page.querySelector("#selectOnePaceQuality").value = config.OnePacePreferredQuality || "1080p";
-                    page.querySelector("#selectOnePaceLanguage").value = config.OnePacePreferredLanguage || "jp";
+                    page.querySelector("#selectOnePaceMode").value = config.OnePaceIntegrationMode || "StandaloneSeries";
+                    page.querySelector("#txtOnePaceTargetDirectory").value = config.OnePaceTargetLibraryPath || "";
+                    page.querySelector("#selectOnePaceQuality").value = String(config.OnePacePreferredQuality || 1080);
+                    page.querySelector("#selectOnePaceLanguage").value = config.OnePaceLanguage || "sub";
                     page.querySelector("#txtOnePacePixeldrainApiKey").value = config.OnePacePixeldrainApiKey || "";
 
                     // Naruto Kai
                     page.querySelector("#chkEnableNarutoKai").checked = config.EnableNarutoKai === true;
-                    page.querySelector("#txtNarutoKaiTargetDirectory").value = config.NarutoKaiTargetDirectory || "";
-                    page.querySelector("#selectNarutoKaiLanguage").value = config.NarutoKaiLanguage || "jp";
+                    page.querySelector("#txtNarutoKaiTargetDirectory").value = config.NarutoKaiTargetLibraryPath || "";
+                    page.querySelector("#selectNarutoKaiLanguage").value = config.NarutoKaiLanguage || "sub";
 
                     // Bleach Kai
                     page.querySelector("#chkEnableBleachKai").checked = config.EnableBleachKai === true;
-                    page.querySelector("#txtBleachKaiTargetDirectory").value = config.BleachKaiTargetDirectory || "";
-                    page.querySelector("#selectBleachKaiLanguage").value = config.BleachKaiLanguage || "jp";
+                    page.querySelector("#txtBleachKaiTargetDirectory").value = config.BleachKaiTargetLibraryPath || "";
+                    page.querySelector("#selectBleachKaiLanguage").value = config.BleachKaiLanguage || "sub";
 
                     // Consumet
                     page.querySelector("#chkEnableConsumet").checked = config.EnableConsumet === true;
                     page.querySelector("#selectConsumetIntegrationMode").value = config.ConsumetIntegrationMode || "DedicatedLibrary";
-                    page.querySelector("#txtConsumetApiUrl").value = config.ConsumetApiUrl || "";
+                    page.querySelector("#txtConsumetApiUrl").value = config.ConsumetApiUrl || "http://consumet-proxy:3000";
                     page.querySelector("#selectConsumetProvider").value = config.ConsumetProvider || "hianime";
-                    page.querySelector("#txtConsumetAnimeSlugs").value = config.ConsumetAnimeSlugs || "";
+                    page.querySelector("#txtConsumetAnimeSlugs").value = config.ConsumetSubscribedShows || "";
 
                     toggleSection("chkEnableRezero", "sectionRezeroSettings");
                     toggleSection("chkEnableOnePace", "sectionOnePaceSettings");
@@ -398,13 +406,18 @@
                     var lastSync = lastSyncUtc ? new Date(lastSyncUtc).toLocaleString() : "Never";
                     var syncStatus = status.lastSyncStatus || status.LastSyncStatus || "Idle";
                     var totalEpisodes = status.totalSyncedEpisodes !== undefined ? status.totalSyncedEpisodes : (status.TotalSyncedEpisodes || 0);
-                    var activeProviders = (status.activeProviders || status.ActiveProviders || []).join(", ") || "None enabled";
-                    var resolvedStorage = status.resolvedStoragePath || status.ResolvedStoragePath || "Auto-detecting...";
+                    var providersList = status.providers || status.Providers || [];
+                    var activeProviders = providersList.filter(function(p) { return p.enabled || p.Enabled; }).map(function(p) { return p.displayName || p.DisplayName; }).join(", ") || "None enabled";
+                    var resolvedStorage = status.storageRoot || status.StorageRoot || "Auto-detecting...";
+                    var resolvedLibrary = status.resolvedTargetLibraryPath || status.ResolvedTargetLibraryPath || "/data/tv";
+                    var symlinkActive = (status.isSymlinkActive || status.IsSymlinkActive) ? "Active (Offloaded to " + resolvedStorage + ")" : "Direct";
 
                     statusEl.innerHTML = "<strong>Overall Status:</strong> " + syncStatus +
                         "<br><strong>Active Providers:</strong> " + activeProviders +
                         "<br><strong>Total Synced Episodes:</strong> " + totalEpisodes +
-                        "<br><strong>Physical Storage:</strong> " + resolvedStorage +
+                        "<br><strong>Physical Storage Root:</strong> " + resolvedStorage +
+                        "<br><strong>Target TV Library Root:</strong> " + resolvedLibrary +
+                        "<br><strong>Symlink Offloading:</strong> " + symlinkActive +
                         "<br><strong>Last Sync:</strong> " + lastSync;
                 }).catch(function() {
                     // Fallback to Rezero/Status
@@ -455,43 +468,44 @@
                         config.EnableAutoSync = page.querySelector("#chkEnableAutoSync").checked;
                         config.SyncIntervalHours = parseInt(page.querySelector("#txtSyncIntervalHours").value, 10) || 12;
                         config.EnableSymlink = page.querySelector("#chkEnableSymlink").checked;
-                        config.DedicatedStoragePath = page.querySelector("#txtDedicatedStoragePath").value;
+                        config.DedicatedStoragePath = page.querySelector("#txtDedicatedStoragePath").value.trim();
+                        config.DefaultTargetLibraryPath = page.querySelector("#txtDefaultTargetLibraryPath").value.trim();
 
                         // Re:Zero
                         config.EnableRezero = page.querySelector("#chkEnableRezero").checked;
                         config.IntegrationMode = page.querySelector("#selectIntegrationMode").value;
-                        config.TargetSeriesPath = page.querySelector("#txtTargetSeriesPath").value;
-                        config.StandaloneLibraryPath = page.querySelector("#txtStandaloneLibraryPath").value;
+                        config.TargetSeriesPath = page.querySelector("#txtTargetSeriesPath").value.trim();
+                        config.StandaloneLibraryPath = page.querySelector("#txtStandaloneLibraryPath").value.trim();
                         config.SyncMode = page.querySelector("#selectSyncMode").value;
                         config.StreamFormat = page.querySelector("#selectStreamFormat").value;
                         config.PreferredLanguage = page.querySelector("#selectPreferredLanguage").value;
                         config.PreferredCaptions = page.querySelector("#selectPreferredCaptions").value;
-                        config.ApiBaseUrl = page.querySelector("#txtApiBaseUrl").value;
+                        config.ApiBaseUrl = page.querySelector("#txtApiBaseUrl").value.trim();
 
                         // One Pace
                         config.EnableOnePace = page.querySelector("#chkEnableOnePace").checked;
                         config.OnePaceIntegrationMode = page.querySelector("#selectOnePaceMode").value;
-                        config.OnePaceTargetDirectory = page.querySelector("#txtOnePaceTargetDirectory").value;
-                        config.OnePacePreferredQuality = page.querySelector("#selectOnePaceQuality").value;
-                        config.OnePacePreferredLanguage = page.querySelector("#selectOnePaceLanguage").value;
-                        config.OnePacePixeldrainApiKey = page.querySelector("#txtOnePacePixeldrainApiKey").value;
+                        config.OnePaceTargetLibraryPath = page.querySelector("#txtOnePaceTargetDirectory").value.trim();
+                        config.OnePacePreferredQuality = parseInt(page.querySelector("#selectOnePaceQuality").value, 10) || 1080;
+                        config.OnePaceLanguage = page.querySelector("#selectOnePaceLanguage").value;
+                        config.OnePacePixeldrainApiKey = page.querySelector("#txtOnePacePixeldrainApiKey").value.trim();
 
                         // Naruto Kai
                         config.EnableNarutoKai = page.querySelector("#chkEnableNarutoKai").checked;
-                        config.NarutoKaiTargetDirectory = page.querySelector("#txtNarutoKaiTargetDirectory").value;
+                        config.NarutoKaiTargetLibraryPath = page.querySelector("#txtNarutoKaiTargetDirectory").value.trim();
                         config.NarutoKaiLanguage = page.querySelector("#selectNarutoKaiLanguage").value;
 
                         // Bleach Kai
                         config.EnableBleachKai = page.querySelector("#chkEnableBleachKai").checked;
-                        config.BleachKaiTargetDirectory = page.querySelector("#txtBleachKaiTargetDirectory").value;
+                        config.BleachKaiTargetLibraryPath = page.querySelector("#txtBleachKaiTargetDirectory").value.trim();
                         config.BleachKaiLanguage = page.querySelector("#selectBleachKaiLanguage").value;
 
                         // Consumet
                         config.EnableConsumet = page.querySelector("#chkEnableConsumet").checked;
                         config.ConsumetIntegrationMode = page.querySelector("#selectConsumetIntegrationMode").value;
-                        config.ConsumetApiUrl = page.querySelector("#txtConsumetApiUrl").value;
+                        config.ConsumetApiUrl = page.querySelector("#txtConsumetApiUrl").value.trim();
                         config.ConsumetProvider = page.querySelector("#selectConsumetProvider").value;
-                        config.ConsumetAnimeSlugs = page.querySelector("#txtConsumetAnimeSlugs").value;
+                        config.ConsumetSubscribedShows = page.querySelector("#txtConsumetAnimeSlugs").value.trim();
 
                         ApiClient.updatePluginConfiguration(pluginId, config).then(function (result) {
                             Dashboard.processPluginConfigurationUpdateResult(result);
