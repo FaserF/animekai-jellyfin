@@ -15,6 +15,7 @@ namespace Jellyfin.Plugin.AnimeKai.Services;
 /// </summary>
 internal static class AnimeStorageLinker
 {
+    private static readonly Encoding Utf8WithoutBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
     internal static (string WriteDir, string? PerFileSymlinkDir) EnsureStorageLayout(
         string targetDir,
         string physicalDir,
@@ -157,8 +158,46 @@ internal static class AnimeStorageLinker
             Directory.CreateDirectory(dir);
         }
 
-        await File.WriteAllTextAsync(filePath, newContent, Encoding.UTF8, cancellationToken).ConfigureAwait(false);
+        await File.WriteAllTextAsync(filePath, newContent, Utf8WithoutBom, cancellationToken).ConfigureAwait(false);
         return true;
+    }
+
+    internal static async Task DownloadArtworkAsync(
+        System.Net.Http.HttpClient httpClient,
+        string imageUrl,
+        string destinationPath,
+        ILogger logger,
+        CancellationToken cancellationToken)
+    {
+        if (File.Exists(destinationPath))
+        {
+            return;
+        }
+
+        try
+        {
+            var dir = Path.GetDirectoryName(destinationPath);
+            if (!string.IsNullOrEmpty(dir))
+            {
+                Directory.CreateDirectory(dir);
+            }
+
+            using var response = await httpClient.GetAsync(imageUrl, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                logger.LogWarning("Artwork download from {Url} failed with status {StatusCode}", imageUrl, response.StatusCode);
+                return;
+            }
+
+            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+            await using var fileStream = new FileStream(destinationPath, FileMode.Create, FileAccess.Write, FileShare.None, 4096, useAsync: true);
+            await stream.CopyToAsync(fileStream, cancellationToken).ConfigureAwait(false);
+            logger.LogInformation("Successfully downloaded artwork to {Path}", destinationPath);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to download artwork from {Url} to {Path}", imageUrl, destinationPath);
+        }
     }
 
     internal static void TryDeleteOppositeStrm(string physicalDir, string? symlinkDir, string fileNameBase)
@@ -185,7 +224,8 @@ internal static class AnimeStorageLinker
         string? originalTitle = null,
         IEnumerable<string>? genres = null,
         string? studio = null,
-        string? posterUrl = null)
+        string? posterUrl = null,
+        string? tvdbId = null)
     {
         var elements = new List<object>
         {
@@ -197,6 +237,12 @@ internal static class AnimeStorageLinker
             new XElement("status", "Continuing"),
             new XElement("lockdata", "true")
         };
+
+        if (!string.IsNullOrWhiteSpace(tvdbId))
+        {
+            elements.Add(new XElement("uniqueid", new XAttribute("type", "tvdb"), new XAttribute("default", "true"), tvdbId));
+            elements.Add(new XElement("tvdbid", tvdbId));
+        }
 
         if (genres != null)
         {

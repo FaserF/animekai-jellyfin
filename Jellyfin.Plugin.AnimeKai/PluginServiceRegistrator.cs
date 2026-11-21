@@ -50,6 +50,18 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
             client.DefaultRequestHeaders.Add("User-Agent", "Jellyfin.Plugin.AnimeKai/0.2 (ConsumetGateway)");
         });
 
+        serviceCollection.AddHttpClient<NarutoKaiStreamProvider>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(30);
+            client.DefaultRequestHeaders.Add("User-Agent", "Jellyfin.Plugin.AnimeKai/0.2 (NarutoKaiSync)");
+        });
+
+        serviceCollection.AddHttpClient<BleachKaiStreamProvider>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(30);
+            client.DefaultRequestHeaders.Add("User-Agent", "Jellyfin.Plugin.AnimeKai/0.2 (BleachKaiSync)");
+        });
+
         // Register Providers
         serviceCollection.AddSingleton<IAnimeStreamProvider, RezeroStreamProvider>();
         serviceCollection.AddSingleton<IAnimeStreamProvider, OnePaceStreamProvider>();

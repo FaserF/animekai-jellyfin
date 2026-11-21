@@ -95,7 +95,7 @@ public class RezeroStreamProvider : IAnimeStreamProvider
                     new[] { "Animation", "Anime", "Fantasy", "Drama", "Psychological", "Thriller" },
                     "White Fox / Perfect Run Team",
                     "https://rezeroperfect.run/juicy_prototype/images/arc1.jpg");
-                await File.WriteAllTextAsync(tvshowNfo, content, cancellationToken).ConfigureAwait(false);
+                await AnimeStorageLinker.WriteIfChangedAsync(tvshowNfo, content, cancellationToken).ConfigureAwait(false);
             }
         }
 

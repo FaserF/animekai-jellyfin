@@ -64,7 +64,7 @@ public class ProviderTests
                 NarutoKaiTargetLibraryPath = showDir
             };
 
-            var provider = new NarutoKaiStreamProvider(Mock.Of<ILibraryManager>(), NullLogger<NarutoKaiStreamProvider>.Instance);
+            var provider = new NarutoKaiStreamProvider(new HttpClient(), Mock.Of<ILibraryManager>(), NullLogger<NarutoKaiStreamProvider>.Instance);
             var context = new SyncContext(config, tempRoot, false);
 
             var result = await provider.SyncEpisodesAsync(context, null, ct);
@@ -77,6 +77,10 @@ public class ProviderTests
 
             var sampleStrm = await File.ReadAllTextAsync(strmFiles[0], ct);
             sampleStrm.Should().StartWith("https://");
+
+            var rawBytes = await File.ReadAllBytesAsync(strmFiles[0], ct);
+            var hasBom = rawBytes.Length >= 3 && rawBytes[0] == 0xEF && rawBytes[1] == 0xBB && rawBytes[2] == 0xBF;
+            hasBom.Should().BeFalse("Generated .strm files must not contain UTF-8 BOM");
         }
         finally
         {
@@ -103,7 +107,7 @@ public class ProviderTests
                 BleachKaiTargetLibraryPath = showDir
             };
 
-            var provider = new BleachKaiStreamProvider(Mock.Of<ILibraryManager>(), NullLogger<BleachKaiStreamProvider>.Instance);
+            var provider = new BleachKaiStreamProvider(new HttpClient(), Mock.Of<ILibraryManager>(), NullLogger<BleachKaiStreamProvider>.Instance);
             var context = new SyncContext(config, tempRoot, false);
 
             var result = await provider.SyncEpisodesAsync(context, null, ct);
@@ -113,6 +117,10 @@ public class ProviderTests
             File.Exists(Path.Combine(showDir, "tvshow.nfo")).Should().BeTrue();
             var strmFiles = Directory.GetFiles(showDir, "*.strm", SearchOption.AllDirectories);
             strmFiles.Should().HaveCount(36);
+
+            var rawBytes = await File.ReadAllBytesAsync(strmFiles[0], ct);
+            var hasBom = rawBytes.Length >= 3 && rawBytes[0] == 0xEF && rawBytes[1] == 0xBB && rawBytes[2] == 0xBF;
+            hasBom.Should().BeFalse("Generated .strm files must not contain UTF-8 BOM");
         }
         finally
         {

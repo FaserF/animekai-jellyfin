@@ -188,11 +188,11 @@ public class ConsumetStreamProvider : IAnimeStreamProvider
                         info.Description ?? string.Empty,
                         genres: info.Genres,
                         posterUrl: info.Image ?? info.Cover);
-                    await File.WriteAllTextAsync(tvshowNfo, content, cancellationToken).ConfigureAwait(false);
+                    await AnimeStorageLinker.WriteIfChangedAsync(tvshowNfo, content, cancellationToken).ConfigureAwait(false);
                     if (!string.Equals(physicalShowDir, targetShowDir, StringComparison.OrdinalIgnoreCase))
                     {
                         var physNfo = Path.Combine(physicalShowDir, "tvshow.nfo");
-                        await File.WriteAllTextAsync(physNfo, content, cancellationToken).ConfigureAwait(false);
+                        await AnimeStorageLinker.WriteIfChangedAsync(physNfo, content, cancellationToken).ConfigureAwait(false);
                     }
                 }
 
@@ -294,6 +294,14 @@ public class ConsumetStreamProvider : IAnimeStreamProvider
             return config.ConsumetTargetLibraryPath;
         }
 
+        // DedicatedLibrary mode (default): Keep Consumet series isolated in its own dedicated library directory
+        if (!string.Equals(config.ConsumetIntegrationMode, "Integrated", StringComparison.OrdinalIgnoreCase))
+        {
+            var dedicatedDir = Path.Combine(storageRoot, "Consumet");
+            Directory.CreateDirectory(dedicatedDir);
+            return dedicatedDir;
+        }
+
         var virtualFolders = _libraryManager.GetVirtualFolders() ?? new List<VirtualFolderInfo>();
         var tvFolders = virtualFolders.Where(f => string.Equals(f.CollectionType?.ToString(), "tvshows", StringComparison.OrdinalIgnoreCase)).SelectMany(f => f.Locations).ToList();
         foreach (var folder in tvFolders)
@@ -304,7 +312,9 @@ public class ConsumetStreamProvider : IAnimeStreamProvider
             }
         }
 
-        return Path.Combine(storageRoot, "Streams");
+        var fallbackDir = Path.Combine(storageRoot, "Consumet");
+        Directory.CreateDirectory(fallbackDir);
+        return fallbackDir;
     }
 
     private static string Sanitize(string name)

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.AnimeKai.Configuration;
@@ -27,14 +28,16 @@ public record NarutoKaiVolume(int VolumeNumber, string Title, string Chapters, s
 /// </summary>
 public class NarutoKaiStreamProvider : IAnimeStreamProvider
 {
+    private readonly HttpClient _httpClient;
     private readonly ILibraryManager _libraryManager;
     private readonly ILogger<NarutoKaiStreamProvider> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="NarutoKaiStreamProvider"/> class.
     /// </summary>
-    public NarutoKaiStreamProvider(ILibraryManager libraryManager, ILogger<NarutoKaiStreamProvider> logger)
+    public NarutoKaiStreamProvider(HttpClient httpClient, ILibraryManager libraryManager, ILogger<NarutoKaiStreamProvider> logger)
     {
+        _httpClient = httpClient;
         _libraryManager = libraryManager;
         _logger = logger;
     }
@@ -61,23 +64,26 @@ public class NarutoKaiStreamProvider : IAnimeStreamProvider
 
         // tvshow.nfo
         var tvshowNfo = Path.Combine(showDir, "tvshow.nfo");
-        if (!File.Exists(tvshowNfo))
+        var showPlot = "Naruto Kai is a fan-edit that condenses the anime into 72 volume-length episodes corresponding to the 72 manga volumes created by Masashi Kishimoto. Every non-canon filler episode, recap, and repetitive flashback has been removed.";
+        var content = AnimeStorageLinker.BuildTvShowNfo(
+            "Naruto Kai",
+            showPlot,
+            "NARUTO (Naruto Kai)",
+            new[] { "Animation", "Anime", "Action", "Adventure", "Martial Arts", "Fantasy" },
+            "Naruto Kai Team",
+            null,
+            tvdbId: "78857");
+        await AnimeStorageLinker.WriteIfChangedAsync(tvshowNfo, content, cancellationToken).ConfigureAwait(false);
+        if (!string.Equals(physicalShowDir, showDir, StringComparison.OrdinalIgnoreCase))
         {
-            var showPlot = "Naruto Kai is a fan-edit that condenses the anime into 72 volume-length episodes corresponding to the 72 manga volumes created by Masashi Kishimoto. Every non-canon filler episode, recap, and repetitive flashback has been removed.";
-            var content = AnimeStorageLinker.BuildTvShowNfo(
-                "Naruto Kai",
-                showPlot,
-                "NARUTO (Naruto Kai)",
-                new[] { "Animation", "Anime", "Action", "Adventure", "Martial Arts", "Fantasy" },
-                "Naruto Kai Team",
-                null);
-            await File.WriteAllTextAsync(tvshowNfo, content, cancellationToken).ConfigureAwait(false);
-            if (!string.Equals(physicalShowDir, showDir, StringComparison.OrdinalIgnoreCase))
-            {
-                var physNfo = Path.Combine(physicalShowDir, "tvshow.nfo");
-                await File.WriteAllTextAsync(physNfo, content, cancellationToken).ConfigureAwait(false);
-            }
+            var physNfo = Path.Combine(physicalShowDir, "tvshow.nfo");
+            await AnimeStorageLinker.WriteIfChangedAsync(physNfo, content, cancellationToken).ConfigureAwait(false);
         }
+
+        // Download official artwork from TVDB (anchors correct poster and banner)
+        await AnimeStorageLinker.DownloadArtworkAsync(_httpClient, "https://artworks.thetvdb.com/banners/posters/78857-1.jpg", Path.Combine(showDir, "poster.jpg"), _logger, cancellationToken).ConfigureAwait(false);
+        await AnimeStorageLinker.DownloadArtworkAsync(_httpClient, "https://artworks.thetvdb.com/banners/graphical/78857-g.jpg", Path.Combine(showDir, "banner.jpg"), _logger, cancellationToken).ConfigureAwait(false);
+        await AnimeStorageLinker.DownloadArtworkAsync(_httpClient, "https://artworks.thetvdb.com/banners/fanart/original/78857-1.jpg", Path.Combine(showDir, "backdrop.jpg"), _logger, cancellationToken).ConfigureAwait(false);
 
         var volumes = GetVolumes();
         var targetSeasonDir = Path.Combine(showDir, "Season 01");
@@ -96,7 +102,9 @@ public class NarutoKaiStreamProvider : IAnimeStreamProvider
             var vol = volumes[i];
             var isDub = string.Equals(config.NarutoKaiLanguage, "dub", StringComparison.OrdinalIgnoreCase);
             var langTag = isDub ? "Dub" : "Sub";
-            var streamUrl = $"https://archive.org/download/naruto-kai-vol-{vol.VolumeNumber:D2}/Naruto_Kai_Vol_{vol.VolumeNumber:D2}_{langTag}.mp4";
+            var streamUrl = !string.IsNullOrWhiteSpace(config.NarutoKaiBaseStreamUrl)
+                ? $"{config.NarutoKaiBaseStreamUrl.TrimEnd('/')}/Naruto_Kai_Vol_{vol.VolumeNumber:D2}_{langTag}.mp4"
+                : $"https://archive.org/download/naruto-kai-vol-{vol.VolumeNumber:D2}/Naruto_Kai_Vol_{vol.VolumeNumber:D2}_{langTag}.mp4";
 
             var fileNameBase = $"Naruto Kai - S01E{vol.VolumeNumber:D2} - [Vol {vol.VolumeNumber:D2}] {Sanitize(vol.Title)}";
             var strmFile = Path.Combine(writeDir, $"{fileNameBase}.strm");

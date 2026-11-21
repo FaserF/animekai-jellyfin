@@ -91,7 +91,7 @@ On a fresh install, all external providers default to `false` until enabled by t
 | `EnableRezero` | `bool` | `false` | Enables Re:Zero - The Perfect Run synchronization. |
 | `IntegrationMode` | `string` | `"SpecialSeason"` | `"SpecialSeason"` (Season 00 in existing show) or `"StandaloneSeries"`. |
 | `SyncMode` | `string` | `"Stream"` | `"Stream"` (.strm pointers) or `"Download"` (HTTPS MP4 downloads). |
-| `StreamFormat` | `string` | `"hls_auto"` | `"hls_auto"` (adaptive HLS master) or `"direct_mp4"`. |
+| `StreamFormat` | `string` | `"hls_direct"` | `"hls_direct"` (instant single-variant playback, <1.5s), `"hls_auto"` (adaptive multi-variant master), or `"direct_mp4"`. |
 | `PreferredLanguage` | `string` | `"jp"` | `"jp"` (Japanese original) or `"en"` (English dub). |
 | `PreferredCaptions` | `string` | `"cc"` | `"cc"` (burned-in CC) or `"clean"` (no hardsubs). |
 
@@ -99,7 +99,7 @@ On a fresh install, all external providers default to `false` until enabled by t
 | Setting | Type | Default | Description |
 |---|---|---|---|
 | `EnableOnePace` | `bool` | `false` | Enables One Pace synchronization. |
-| `OnePaceIntegrationMode` | `string` | `"StandaloneSeries"` | `"StandaloneSeries"` (Seasons 1..34) or `"SpecialSeason"`. |
+| `OnePaceIntegrationMode` | `string` | `"StandaloneSeries"` | `"StandaloneSeries"` (Seasons 1..38 matching manga arcs) or `"SpecialSeason"`. |
 | `OnePaceTargetLibraryPath`| `string` | `""` | Destination anime library folder (blank = auto-detect). |
 | `OnePacePreferredQuality` | `int` | `1080` | Preferred stream quality (`1080`, `720`). |
 | `OnePaceLanguage` | `string` | `"sub"` | `"sub"` (Japanese + English Subtitles) or `"dub"`. |
@@ -108,20 +108,23 @@ On a fresh install, all external providers default to `false` until enabled by t
 ### Provider: Naruto Kai & Bleach Kai
 | Setting | Type | Default | Description |
 |---|---|---|---|
-| `EnableNarutoKai` | `bool` | `false` | Enables 72-volume Naruto Kai synchronization. |
+| `EnableNarutoKai` | `bool` | `false` | Enables 72-volume Naruto Kai synchronization with locked TVDB ID `78857` and official TVDB poster/banner download. |
 | `NarutoKaiTargetLibraryPath` | `string` | `""` | Destination anime library folder. |
 | `NarutoKaiLanguage` | `string` | `"sub"` | `"sub"` (Japanese + Subs) or `"dub"`. |
-| `EnableBleachKai` | `bool` | `false` | Enables 36-volume Bleach Kai synchronization. |
+| `NarutoKaiBaseStreamUrl` | `string` | `""` | Optional custom base HTTPS stream URL override. |
+| `EnableBleachKai` | `bool` | `false` | Enables 36-volume Bleach Kai synchronization with locked TVDB ID `74796` and official TVDB poster/banner download. |
 | `BleachKaiTargetLibraryPath` | `string` | `""` | Destination anime library folder. |
 | `BleachKaiLanguage` | `string` | `"sub"` | `"sub"` (Japanese + Subs) or `"dub"`. |
+| `BleachKaiBaseStreamUrl` | `string` | `""` | Optional custom base HTTPS stream URL override. |
 
 ### Provider: Consumet HLS Gateway
 | Setting | Type | Default | Description |
 |---|---|---|---|
-| `EnableConsumet` | `bool` | `false` | Enables on-demand scraping via Consumet container. |
-| `ConsumetApiUrl` | `string` | `"http://127.0.0.1:3000"` | Base URL to self-hosted Consumet instance. |
-| `ConsumetProvider` | `string` | `"gogoanime"` | Scraper provider (`"gogoanime"`, `"zoro"`, `"animepahe"`). |
-| `ConsumetSubscribedShows` | `string` | `""` | Comma-separated anime slugs (e.g. `"steinsgate, chainsaw-man"`). |
+| `EnableConsumet` | `bool` | `false` | Enables on-demand scraping via self-hosted `consumet-proxy` container. |
+| `ConsumetIntegrationMode` | `string` | `"DedicatedLibrary"` | `"DedicatedLibrary"` (isolated `/data/animekai/Consumet/`, default) or `"Integrated"` (merged with TV shows). |
+| `ConsumetApiUrl` | `string` | `"http://consumet-proxy:3000"` | Base URL to self-hosted Consumet proxy container. |
+| `ConsumetProvider` | `string` | `"hianime"` | Scraper provider (`"hianime"`, `"zoro"`, `"animepahe"`). |
+| `ConsumetSubscribedShows` | `string` | `""` | Comma-separated anime slugs (e.g. `"naruto-1335, chainsaw-man"`). |
 
 ---
 

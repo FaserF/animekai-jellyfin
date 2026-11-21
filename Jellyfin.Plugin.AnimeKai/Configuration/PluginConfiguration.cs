@@ -124,9 +124,9 @@ public class PluginConfiguration : BasePluginConfiguration
     public string PreferredQuality { get; set; } = "1080p";
 
     /// <summary>
-    /// Gets or sets the stream format ("hls_auto" [Default, fast adaptive HLS master] or "direct_mp4").
+    /// Gets or sets the stream format ("hls_direct" [Default, instant single-variant HLS], "hls_auto" [Adaptive bitrate master], or "direct_mp4").
     /// </summary>
-    public string StreamFormat { get; set; } = "hls_auto";
+    public string StreamFormat { get; set; } = "hls_direct";
 
     /// <summary>
     /// Gets or sets the API base URL.
@@ -238,6 +238,11 @@ public class PluginConfiguration : BasePluginConfiguration
     /// </summary>
     public string NarutoKaiLanguage { get; set; } = "sub";
 
+    /// <summary>
+    /// Gets or sets an optional custom base URL for Naruto Kai episodes (e.g. https://mycdn.example.com/narutokai/).
+    /// </summary>
+    public string NarutoKaiBaseStreamUrl { get; set; } = string.Empty;
+
     // ==========================================
     // Provider 4: Bleach Kai
     // ==========================================
@@ -263,6 +268,11 @@ public class PluginConfiguration : BasePluginConfiguration
     /// </summary>
     public string BleachKaiLanguage { get; set; } = "sub";
 
+    /// <summary>
+    /// Gets or sets an optional custom base URL for Bleach Kai episodes (e.g. https://mycdn.example.com/bleachkai/).
+    /// </summary>
+    public string BleachKaiBaseStreamUrl { get; set; } = string.Empty;
+
     // ==========================================
     // Provider 5: Consumet / AniCli HLS Gateway
     // ==========================================
@@ -274,14 +284,19 @@ public class PluginConfiguration : BasePluginConfiguration
     public bool EnableConsumet { get; set; } = false;
 
     /// <summary>
-    /// Gets or sets the base URL for the Consumet API container (e.g. http://127.0.0.1:3000 or http://consumet:3000).
+    /// Gets or sets the Consumet integration mode ("DedicatedLibrary" [Default] or "Integrated").
     /// </summary>
-    public string ConsumetApiUrl { get; set; } = "http://127.0.0.1:3000";
+    public string ConsumetIntegrationMode { get; set; } = "DedicatedLibrary";
 
     /// <summary>
-    /// Gets or sets the scraper provider name inside Consumet (default: "gogoanime", options: "zoro", "animepahe").
+    /// Gets or sets the base URL for the Consumet API container (default: http://consumet-proxy:3000 on docker network).
     /// </summary>
-    public string ConsumetProvider { get; set; } = "gogoanime";
+    public string ConsumetApiUrl { get; set; } = "http://consumet-proxy:3000";
+
+    /// <summary>
+    /// Gets or sets the scraper provider name inside Consumet (default: "hianime", options: "zoro", "gogoanime", "animepahe").
+    /// </summary>
+    public string ConsumetProvider { get; set; } = "hianime";
 
     /// <summary>
     /// Gets or sets the target library folder for Consumet on-demand streaming series.

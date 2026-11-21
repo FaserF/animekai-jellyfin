@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.AnimeKai.Configuration;
@@ -27,14 +28,16 @@ public record BleachKaiVolume(int VolumeNumber, string Title, string Chapters, s
 /// </summary>
 public class BleachKaiStreamProvider : IAnimeStreamProvider
 {
+    private readonly HttpClient _httpClient;
     private readonly ILibraryManager _libraryManager;
     private readonly ILogger<BleachKaiStreamProvider> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="BleachKaiStreamProvider"/> class.
     /// </summary>
-    public BleachKaiStreamProvider(ILibraryManager libraryManager, ILogger<BleachKaiStreamProvider> logger)
+    public BleachKaiStreamProvider(HttpClient httpClient, ILibraryManager libraryManager, ILogger<BleachKaiStreamProvider> logger)
     {
+        _httpClient = httpClient;
         _libraryManager = libraryManager;
         _logger = logger;
     }
@@ -61,23 +64,26 @@ public class BleachKaiStreamProvider : IAnimeStreamProvider
 
         // tvshow.nfo
         var tvshowNfo = Path.Combine(showDir, "tvshow.nfo");
-        if (!File.Exists(tvshowNfo))
+        var showPlot = "Bleach Kai is a canon-focused fan-edit of the Bleach anime that completely excises non-canon filler arcs (Bount, Amagai, Zanpakuto Rebellion, and Invading Army) and excessive padding, condensing Tite Kubo's manga into 36 volume-length episodes.";
+        var content = AnimeStorageLinker.BuildTvShowNfo(
+            "Bleach Kai",
+            showPlot,
+            "BLEACH (Bleach Kai)",
+            new[] { "Animation", "Anime", "Action", "Supernatural", "Swordplay" },
+            "Bleach Kai Team",
+            null,
+            tvdbId: "74796");
+        await AnimeStorageLinker.WriteIfChangedAsync(tvshowNfo, content, cancellationToken).ConfigureAwait(false);
+        if (!string.Equals(physicalShowDir, showDir, StringComparison.OrdinalIgnoreCase))
         {
-            var showPlot = "Bleach Kai is a canon-focused fan-edit of the Bleach anime that completely excises non-canon filler arcs (Bount, Amagai, Zanpakuto Rebellion, and Invading Army) and excessive padding, condensing Tite Kubo's manga into 36 volume-length episodes.";
-            var content = AnimeStorageLinker.BuildTvShowNfo(
-                "Bleach Kai",
-                showPlot,
-                "BLEACH (Bleach Kai)",
-                new[] { "Animation", "Anime", "Action", "Supernatural", "Swordplay" },
-                "Bleach Kai Team",
-                null);
-            await File.WriteAllTextAsync(tvshowNfo, content, cancellationToken).ConfigureAwait(false);
-            if (!string.Equals(physicalShowDir, showDir, StringComparison.OrdinalIgnoreCase))
-            {
-                var physNfo = Path.Combine(physicalShowDir, "tvshow.nfo");
-                await File.WriteAllTextAsync(physNfo, content, cancellationToken).ConfigureAwait(false);
-            }
+            var physNfo = Path.Combine(physicalShowDir, "tvshow.nfo");
+            await AnimeStorageLinker.WriteIfChangedAsync(physNfo, content, cancellationToken).ConfigureAwait(false);
         }
+
+        // Download official artwork from TVDB
+        await AnimeStorageLinker.DownloadArtworkAsync(_httpClient, "https://artworks.thetvdb.com/banners/posters/74796-1.jpg", Path.Combine(showDir, "poster.jpg"), _logger, cancellationToken).ConfigureAwait(false);
+        await AnimeStorageLinker.DownloadArtworkAsync(_httpClient, "https://artworks.thetvdb.com/banners/graphical/74796-g.jpg", Path.Combine(showDir, "banner.jpg"), _logger, cancellationToken).ConfigureAwait(false);
+        await AnimeStorageLinker.DownloadArtworkAsync(_httpClient, "https://artworks.thetvdb.com/banners/fanart/original/74796-1.jpg", Path.Combine(showDir, "backdrop.jpg"), _logger, cancellationToken).ConfigureAwait(false);
 
         var volumes = GetVolumes();
         var targetSeasonDir = Path.Combine(showDir, "Season 01");
@@ -96,7 +102,9 @@ public class BleachKaiStreamProvider : IAnimeStreamProvider
             var vol = volumes[i];
             var isDub = string.Equals(config.BleachKaiLanguage, "dub", StringComparison.OrdinalIgnoreCase);
             var langTag = isDub ? "Dub" : "Sub";
-            var streamUrl = $"https://archive.org/download/bleach-kai-vol-{vol.VolumeNumber:D2}/Bleach_Kai_Vol_{vol.VolumeNumber:D2}_{langTag}.mp4";
+            var streamUrl = !string.IsNullOrWhiteSpace(config.BleachKaiBaseStreamUrl)
+                ? $"{config.BleachKaiBaseStreamUrl.TrimEnd('/')}/Bleach_Kai_Vol_{vol.VolumeNumber:D2}_{langTag}.mp4"
+                : $"https://archive.org/download/bleach-kai-vol-{vol.VolumeNumber:D2}/Bleach_Kai_Vol_{vol.VolumeNumber:D2}_{langTag}.mp4";
 
             var fileNameBase = $"Bleach Kai - S01E{vol.VolumeNumber:D2} - [Vol {vol.VolumeNumber:D2}] {Sanitize(vol.Title)}";
             var strmFile = Path.Combine(writeDir, $"{fileNameBase}.strm");

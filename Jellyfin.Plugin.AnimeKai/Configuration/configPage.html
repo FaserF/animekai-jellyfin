@@ -262,17 +262,26 @@
                         </div>
 
                         <div id="sectionConsumetSettings" style="display: none; padding-left: 16px; border-left: 2px solid #9932CC; margin-top: 12px;">
+                            <div class="selectContainer">
+                                <label class="selectLabel" for="selectConsumetIntegrationMode">Consumet Library Integration</label>
+                                <select is="emby-select" id="selectConsumetIntegrationMode" name="ConsumetIntegrationMode" class="emby-select">
+                                    <option value="DedicatedLibrary">Dedicated Anime Library (/data/animekai/Consumet) [Default]</option>
+                                    <option value="Integrated">Integrate into existing TV Shows Library</option>
+                                </select>
+                                <div class="fieldDescription">Choose whether Consumet on-demand streaming anime should be stored in a dedicated library folder or merged into existing TV shows.</div>
+                            </div>
+
                             <div class="inputContainer">
                                 <label class="inputLabel inputLabelUnfocused" for="txtConsumetApiUrl">Consumet API Endpoint URL</label>
-                                <input is="emby-input" type="text" id="txtConsumetApiUrl" name="ConsumetApiUrl" class="emby-input" placeholder="http://127.0.0.1:3000" />
-                                <div class="fieldDescription">Base URL to your self-hosted Consumet Docker container or public instance.</div>
+                                <input is="emby-input" type="text" id="txtConsumetApiUrl" name="ConsumetApiUrl" class="emby-input" placeholder="http://consumet-proxy:3000" />
+                                <div class="fieldDescription">Base URL to your self-hosted Consumet Docker container (default: http://consumet-proxy:3000).</div>
                             </div>
 
                             <div class="selectContainer">
                                 <label class="selectLabel" for="selectConsumetProvider">Scraper Provider</label>
                                 <select is="emby-select" id="selectConsumetProvider" name="ConsumetProvider" class="emby-select">
+                                    <option value="hianime">HiAnime / Zoro (Fast HLS, Sub &amp; Dub) [Default]</option>
                                     <option value="gogoanime">Gogoanime (Fast HLS)</option>
-                                    <option value="zoro">Zoro / Aniwatch (Multi-sub &amp; Dub)</option>
                                     <option value="animepahe">AnimePahe (Multi-quality)</option>
                                 </select>
                             </div>
@@ -366,8 +375,9 @@
 
                     // Consumet
                     page.querySelector("#chkEnableConsumet").checked = config.EnableConsumet === true;
+                    page.querySelector("#selectConsumetIntegrationMode").value = config.ConsumetIntegrationMode || "DedicatedLibrary";
                     page.querySelector("#txtConsumetApiUrl").value = config.ConsumetApiUrl || "";
-                    page.querySelector("#selectConsumetProvider").value = config.ConsumetProvider || "gogoanime";
+                    page.querySelector("#selectConsumetProvider").value = config.ConsumetProvider || "hianime";
                     page.querySelector("#txtConsumetAnimeSlugs").value = config.ConsumetAnimeSlugs || "";
 
                     toggleSection("chkEnableRezero", "sectionRezeroSettings");
@@ -477,6 +487,7 @@
 
                         // Consumet
                         config.EnableConsumet = page.querySelector("#chkEnableConsumet").checked;
+                        config.ConsumetIntegrationMode = page.querySelector("#selectConsumetIntegrationMode").value;
                         config.ConsumetApiUrl = page.querySelector("#txtConsumetApiUrl").value;
                         config.ConsumetProvider = page.querySelector("#selectConsumetProvider").value;
                         config.ConsumetAnimeSlugs = page.querySelector("#txtConsumetAnimeSlugs").value;
