@@ -9,6 +9,22 @@
     "imageUrl": "https://raw.githubusercontent.com/FaserF/animekai-jellyfin/main/Jellyfin.Plugin.AnimeKai/thumb.png",
     "versions": [
       {
+        "version": "0.4.0.0",
+        "changelog": "Changes since `v0.3.0`:\n\n### ✨ New Features\n\n- direct storage path, locked metadata, clean episode titles, and NFO separation ([c4336f8](https://github.com/FaserF/animekai-jellyfin/commit/c4336f8))\n- **titles:** put episode titles before fan-edit arc/volume tags across all providers ([a48a23b](https://github.com/FaserF/animekai-jellyfin/commit/a48a23b))\n- **library:** add global DefaultTargetLibraryPath (/data/tv), rank primary TV library, and prevent Season 00 mid-season injection ([d5561c6](https://github.com/FaserF/animekai-jellyfin/commit/d5561c6))\n\n### 🔄 CI / CD\n\n- **release:** preserve 3-part SemVer tag for release bumps while retaining 4-part assembly version ([07c8399](https://github.com/FaserF/animekai-jellyfin/commit/07c8399))",
+        "targetAbi": "10.10.0.0",
+        "sourceUrl": "https://github.com/FaserF/animekai-jellyfin/releases/download/v0.4.0/animekai.zip",
+        "checksum": "268fcac80ad06c4280e2f5b855e0ff4e",
+        "timestamp": "2026-11-21T16:35:04Z"
+      },
+      {
+        "version": "0.4.0.0",
+        "changelog": "Changes since `v0.3.0`:\n\n### ✨ New Features\n\n- direct storage path, locked metadata, clean episode titles, and NFO separation ([c4336f8](https://github.com/FaserF/animekai-jellyfin/commit/c4336f8))\n- **titles:** put episode titles before fan-edit arc/volume tags across all providers ([a48a23b](https://github.com/FaserF/animekai-jellyfin/commit/a48a23b))\n- **library:** add global DefaultTargetLibraryPath (/data/tv), rank primary TV library, and prevent Season 00 mid-season injection ([d5561c6](https://github.com/FaserF/animekai-jellyfin/commit/d5561c6))\n\n### 🔄 CI / CD\n\n- **release:** preserve 3-part SemVer tag for release bumps while retaining 4-part assembly version ([07c8399](https://github.com/FaserF/animekai-jellyfin/commit/07c8399))",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/FaserF/animekai-jellyfin/releases/download/v0.4.0/animekai.zip",
+        "checksum": "268fcac80ad06c4280e2f5b855e0ff4e",
+        "timestamp": "2026-11-21T16:35:04Z"
+      },
+      {
         "version": "0.3.0.0",
         "changelog": "Changes since `v0.1.1-beta`:\n\n### ✨ New Features\n\n- transform into universal Anime Kai & Fan-Edits plugin supporting Re:Zero, One Pace, Naruto Kai, Bleach Kai, and Consumet HLS Gateway ([2aef3c1](https://github.com/FaserF/animekai-jellyfin/commit/2aef3c1))\n\n### 🐛 Bug Fixes\n\n- **kai:** route Naruto Kai and Bleach Kai defaults through consumet-proxy HLS ([bbab8f9](https://github.com/FaserF/animekai-jellyfin/commit/bbab8f9))\n- **animekai:** optimize stream loading, fix artwork and integrate consumet-proxy v0.2.2.0 ([c1de967](https://github.com/FaserF/animekai-jellyfin/commit/c1de967))\n- eliminate AngleSharp dependency, add native Next.js One Pace parser, and suppress placeholder image errors ([4b68e5c](https://github.com/FaserF/animekai-jellyfin/commit/4b68e5c))\n- **rezero:** support both and clean in SelectRelativeSourcePath ([bcf3988](https://github.com/FaserF/animekai-jellyfin/commit/bcf3988))\n\n### 📚 Documentation\n\n- add clear HTTPS direct download and zero torrents notice in config UI ([fd60574](https://github.com/FaserF/animekai-jellyfin/commit/fd60574))\n\n### 🔧 Maintenance\n\n- update repository links to FaserF/animekai-jellyfin and fix release manifest zip path ([d201283](https://github.com/FaserF/animekai-jellyfin/commit/d201283))\n- **deps:** update dependency anglesharp to 1.10.5 ([7addd90](https://github.com/FaserF/animekai-jellyfin/commit/7addd90))",
         "targetAbi": "10.10.0.0",
