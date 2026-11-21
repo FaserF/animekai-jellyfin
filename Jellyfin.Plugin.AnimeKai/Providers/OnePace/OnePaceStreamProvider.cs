@@ -173,7 +173,7 @@ public class OnePaceStreamProvider : IAnimeStreamProvider
                 await AnimeStorageLinker.WriteIfChangedAsync(strmFile, streamUrl, cancellationToken).ConfigureAwait(false);
 
                 var epNfo = AnimeStorageLinker.BuildEpisodeNfo(
-                    $"[{arc.Title}] {ep.Title}",
+                    $"{ep.Title} - [{arc.Title}]",
                     "One Pace",
                     seasonNumber,
                     ep.Number,

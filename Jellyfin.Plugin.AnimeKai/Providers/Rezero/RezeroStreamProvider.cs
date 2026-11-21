@@ -157,7 +157,7 @@ public class RezeroStreamProvider : IAnimeStreamProvider
 
                 var nfoFile = Path.Combine(writeDir, $"{fileNameBase}.nfo");
                 var epNfo = AnimeStorageLinker.BuildEpisodeNfo(
-                    $"[The Perfect Run] Arc {arc.Number:D2}: {arc.Title} - {epTitle}",
+                    $"{arc.Title} - {epTitle} - [The Perfect Run] Arc {arc.Number:D2}",
                     "Re: ZERO, Starting Life in Another World",
                     config.SeasonNumber,
                     globalIndex,

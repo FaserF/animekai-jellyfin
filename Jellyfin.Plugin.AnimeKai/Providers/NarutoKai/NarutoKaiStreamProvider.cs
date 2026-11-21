@@ -114,7 +114,7 @@ public class NarutoKaiStreamProvider : IAnimeStreamProvider
             await AnimeStorageLinker.WriteIfChangedAsync(strmFile, streamUrl, cancellationToken).ConfigureAwait(false);
 
             var epNfo = AnimeStorageLinker.BuildEpisodeNfo(
-                $"Vol {vol.VolumeNumber}: {vol.Title}",
+                $"{vol.Title} - [Vol {vol.VolumeNumber:D2}]",
                 "Naruto Kai",
                 1,
                 vol.VolumeNumber,

@@ -29,66 +29,24 @@ internal static class AnimeStorageLinker
         string? providerOverridePath = null)
     {
         if (!string.IsNullOrWhiteSpace(providerOverridePath) && Directory.Exists(providerOverridePath))
-        {
             return providerOverridePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        }
-
         if (!string.IsNullOrWhiteSpace(config.DefaultTargetLibraryPath) && Directory.Exists(config.DefaultTargetLibraryPath))
-        {
             return config.DefaultTargetLibraryPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        }
 
         var virtualFolders = libraryManager.GetVirtualFolders() ?? new List<VirtualFolderInfo>();
         var candidates = new List<(string Path, int Score)>();
 
-        foreach (var vf in virtualFolders)
+        foreach (var vf in virtualFolders.Where(v => string.Equals(v.CollectionType?.ToString(), "tvshows", StringComparison.OrdinalIgnoreCase)))
         {
-            if (!string.Equals(vf.CollectionType?.ToString(), "tvshows", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
             var vfName = vf.Name ?? string.Empty;
-            foreach (var loc in vf.Locations ?? Array.Empty<string>())
+            foreach (var loc in (vf.Locations ?? Array.Empty<string>()).Where(l => !string.IsNullOrWhiteSpace(l) && Directory.Exists(l)))
             {
-                if (string.IsNullOrWhiteSpace(loc) || !Directory.Exists(loc))
-                {
-                    continue;
-                }
-
-                var score = 0;
-                if (string.Equals(loc, "/data/tv", StringComparison.OrdinalIgnoreCase))
-                {
-                    score += 100;
-                }
-
-                if (string.Equals(vfName, "Serien", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(vfName, "TV Shows", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(vfName, "Anime", StringComparison.OrdinalIgnoreCase))
-                {
+                var score = string.Equals(loc, "/data/tv", StringComparison.OrdinalIgnoreCase) ? 100 : 0;
+                if (string.Equals(vfName, "Serien", StringComparison.OrdinalIgnoreCase) || string.Equals(vfName, "TV Shows", StringComparison.OrdinalIgnoreCase) || string.Equals(vfName, "Anime", StringComparison.OrdinalIgnoreCase))
                     score += 50;
-                }
-
-                if (loc.Contains("emby", StringComparison.OrdinalIgnoreCase) ||
-                    vfName.Contains("emby", StringComparison.OrdinalIgnoreCase) ||
-                    loc.Contains("mediathek", StringComparison.OrdinalIgnoreCase) ||
-                    loc.Contains("youtube", StringComparison.OrdinalIgnoreCase))
-                {
+                if (loc.Contains("emby", StringComparison.OrdinalIgnoreCase) || vfName.Contains("emby", StringComparison.OrdinalIgnoreCase) || loc.Contains("mediathek", StringComparison.OrdinalIgnoreCase) || loc.Contains("youtube", StringComparison.OrdinalIgnoreCase))
                     score -= 80;
-                }
-
-                try
-                {
-                    if (Directory.GetDirectories(loc, "*Re*ZERO*", SearchOption.TopDirectoryOnly).Length > 0)
-                    {
-                        score += 40;
-                    }
-                }
-                catch
-                {
-                    // Ignore directory enumeration errors
-                }
-
+                try { if (Directory.GetDirectories(loc, "*Re*ZERO*", SearchOption.TopDirectoryOnly).Length > 0) score += 40; } catch { }
                 candidates.Add((loc.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar), score));
             }
         }
@@ -107,18 +65,11 @@ internal static class AnimeStorageLinker
         if (!string.IsNullOrWhiteSpace(providerOverridePath) && Directory.Exists(providerOverridePath))
         {
             var trimmed = providerOverridePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            return trimmed.EndsWith(showFolderName, StringComparison.OrdinalIgnoreCase)
-                ? trimmed
-                : Path.Combine(trimmed, showFolderName);
+            return trimmed.EndsWith(showFolderName, StringComparison.OrdinalIgnoreCase) ? trimmed : Path.Combine(trimmed, showFolderName);
         }
 
         var libRoot = ResolveTargetTvLibraryRoot(config, libraryManager);
-        if (!string.IsNullOrWhiteSpace(libRoot))
-        {
-            return Path.Combine(libRoot, showFolderName);
-        }
-
-        return Path.Combine(storageRoot, physicalSubfolder);
+        return !string.IsNullOrWhiteSpace(libRoot) ? Path.Combine(libRoot, showFolderName) : Path.Combine(storageRoot, physicalSubfolder);
     }
     internal static (string WriteDir, string? PerFileSymlinkDir) EnsureStorageLayout(
         string targetDir,
@@ -500,12 +451,37 @@ internal static class AnimeStorageLinker
                     continue;
                 }
 
-                if (ep.AirsBeforeSeasonNumber.HasValue ||
+                string? desiredTitle = null;
+                var nfoPath = Path.ChangeExtension(ep.Path, ".nfo");
+                if (File.Exists(nfoPath))
+                {
+                    try
+                    {
+                        var doc = XDocument.Load(nfoPath);
+                        desiredTitle = doc.Root?.Element("title")?.Value;
+                    }
+                    catch
+                    {
+                        // Ignore malformed NFO
+                    }
+                }
+
+                var titleChanged = !string.IsNullOrWhiteSpace(desiredTitle) &&
+                                   !string.Equals(ep.Name, desiredTitle, StringComparison.Ordinal);
+
+                if (titleChanged ||
+                    ep.AirsBeforeSeasonNumber.HasValue ||
                     ep.AirsAfterSeasonNumber.HasValue ||
                     ep.AirsBeforeEpisodeNumber.HasValue ||
                     !ep.IsLocked ||
                     (ep.ProviderIds != null && ep.ProviderIds.Count > 0))
                 {
+                    if (!string.IsNullOrWhiteSpace(desiredTitle))
+                    {
+                        ep.Name = desiredTitle;
+                        ep.SortName = null;
+                    }
+
                     ep.AirsBeforeSeasonNumber = null;
                     ep.AirsAfterSeasonNumber = null;
                     ep.AirsBeforeEpisodeNumber = null;
