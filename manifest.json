@@ -9,6 +9,22 @@
     "imageUrl": "https://raw.githubusercontent.com/FaserF/animekai-jellyfin/main/Jellyfin.Plugin.AnimeKai/thumb.png",
     "versions": [
       {
+        "version": "0.3.0.0",
+        "changelog": "Changes since `v0.1.1-beta`:\n\n### ✨ New Features\n\n- transform into universal Anime Kai & Fan-Edits plugin supporting Re:Zero, One Pace, Naruto Kai, Bleach Kai, and Consumet HLS Gateway ([2aef3c1](https://github.com/FaserF/animekai-jellyfin/commit/2aef3c1))\n\n### 🐛 Bug Fixes\n\n- **kai:** route Naruto Kai and Bleach Kai defaults through consumet-proxy HLS ([bbab8f9](https://github.com/FaserF/animekai-jellyfin/commit/bbab8f9))\n- **animekai:** optimize stream loading, fix artwork and integrate consumet-proxy v0.2.2.0 ([c1de967](https://github.com/FaserF/animekai-jellyfin/commit/c1de967))\n- eliminate AngleSharp dependency, add native Next.js One Pace parser, and suppress placeholder image errors ([4b68e5c](https://github.com/FaserF/animekai-jellyfin/commit/4b68e5c))\n- **rezero:** support both and clean in SelectRelativeSourcePath ([bcf3988](https://github.com/FaserF/animekai-jellyfin/commit/bcf3988))\n\n### 📚 Documentation\n\n- add clear HTTPS direct download and zero torrents notice in config UI ([fd60574](https://github.com/FaserF/animekai-jellyfin/commit/fd60574))\n\n### 🔧 Maintenance\n\n- update repository links to FaserF/animekai-jellyfin and fix release manifest zip path ([d201283](https://github.com/FaserF/animekai-jellyfin/commit/d201283))\n- **deps:** update dependency anglesharp to 1.10.5 ([7addd90](https://github.com/FaserF/animekai-jellyfin/commit/7addd90))",
+        "targetAbi": "10.10.0.0",
+        "sourceUrl": "https://github.com/FaserF/animekai-jellyfin/releases/download/v0.3.0/animekai.zip",
+        "checksum": "72430e2de79c94d28e7e472b4e3d2425",
+        "timestamp": "2026-11-21T13:29:07Z"
+      },
+      {
+        "version": "0.3.0.0",
+        "changelog": "Changes since `v0.1.1-beta`:\n\n### ✨ New Features\n\n- transform into universal Anime Kai & Fan-Edits plugin supporting Re:Zero, One Pace, Naruto Kai, Bleach Kai, and Consumet HLS Gateway ([2aef3c1](https://github.com/FaserF/animekai-jellyfin/commit/2aef3c1))\n\n### 🐛 Bug Fixes\n\n- **kai:** route Naruto Kai and Bleach Kai defaults through consumet-proxy HLS ([bbab8f9](https://github.com/FaserF/animekai-jellyfin/commit/bbab8f9))\n- **animekai:** optimize stream loading, fix artwork and integrate consumet-proxy v0.2.2.0 ([c1de967](https://github.com/FaserF/animekai-jellyfin/commit/c1de967))\n- eliminate AngleSharp dependency, add native Next.js One Pace parser, and suppress placeholder image errors ([4b68e5c](https://github.com/FaserF/animekai-jellyfin/commit/4b68e5c))\n- **rezero:** support both and clean in SelectRelativeSourcePath ([bcf3988](https://github.com/FaserF/animekai-jellyfin/commit/bcf3988))\n\n### 📚 Documentation\n\n- add clear HTTPS direct download and zero torrents notice in config UI ([fd60574](https://github.com/FaserF/animekai-jellyfin/commit/fd60574))\n\n### 🔧 Maintenance\n\n- update repository links to FaserF/animekai-jellyfin and fix release manifest zip path ([d201283](https://github.com/FaserF/animekai-jellyfin/commit/d201283))\n- **deps:** update dependency anglesharp to 1.10.5 ([7addd90](https://github.com/FaserF/animekai-jellyfin/commit/7addd90))",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/FaserF/animekai-jellyfin/releases/download/v0.3.0/animekai.zip",
+        "checksum": "72430e2de79c94d28e7e472b4e3d2425",
+        "timestamp": "2026-11-21T13:29:07Z"
+      },
+      {
         "version": "0.1.1.0",
         "changelog": "Changes since `v0.1.0-beta`:\n\n### 🐛 Bug Fixes\n\n- **playback:** default to fast HLS Auto master streams, add multi-language and caption version switching, and fix controller authorization policy ([afeb92a](https://github.com/FaserF/rezero-jellyfin/commit/afeb92a))",
         "targetAbi": "10.10.0.0",
