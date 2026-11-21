@@ -8,7 +8,7 @@
 [![Jellyfin 10.10+ | 12.x](https://img.shields.io/badge/Jellyfin-10.10%2B%20%7C%2012.x-00A4DC?logo=jellyfin&logoColor=white)](https://jellyfin.org/)
 [![Privacy: Zero-Torrent](https://img.shields.io/badge/Privacy-Zero--Torrent%20%2F%20Direct%20HTTPS-brightgreen)](README.md#-100-direct-tlshttps--zero-torrent-policy)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![GitHub Release](https://img.shields.io/github/v/release/FaserF/rezero-jellyfin?include_prereleases&color=blue)](https://github.com/FaserF/rezero-jellyfin/releases)
+[![GitHub Release](https://img.shields.io/github/v/release/FaserF/animekai-jellyfin?include_prereleases&color=blue)](https://github.com/FaserF/animekai-jellyfin/releases)
 
 *Watch the acclaimed manga-accurate and fan-edited cuts of your favorite anime directly in Jellyfin with **zero-byte `.strm` direct playback**, **rich `.nfo` metadata**, **Intro Skipper segment markers**, and an **automated background update engine**.*
 

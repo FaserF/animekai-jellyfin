@@ -12,6 +12,8 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591;SA1600;CA1031;CA1848;CA2007;NU1902;NU1903</NoWarn>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <RepositoryUrl>https://github.com/FaserF/animekai-jellyfin</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/FaserF/animekai-jellyfin</PackageProjectUrl>
     <JellyfinBinDir Condition="'$(JellyfinBinDir)' == ''">/jellyfin-bin</JellyfinBinDir>
   </PropertyGroup>
 

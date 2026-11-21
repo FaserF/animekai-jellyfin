@@ -327,7 +327,7 @@ def main():
     parser = argparse.ArgumentParser(description="Generate conventional changelog.")
     parser.add_argument("--from-tag", default="", help="Previous git tag to compare from")
     parser.add_argument("--total-commits", type=int, default=0, help="Total commit count hint")
-    parser.add_argument("--repo", default="FaserF/rezero-jellyfin", help="GitHub repo (owner/repo)")
+    parser.add_argument("--repo", default="FaserF/animekai-jellyfin", help="GitHub repo (owner/repo)")
     args = parser.parse_args()
 
     changelog = build_changelog(args.from_tag, args.total_commits, args.repo)

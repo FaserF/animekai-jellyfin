@@ -94,4 +94,4 @@ jobs:
 
       - name: Test Changelog Generator Dry-Run
         run: |
-          python .github/scripts/generate_changelog.py --repo FaserF/rezero-jellyfin > /dev/null
+          python .github/scripts/generate_changelog.py --repo FaserF/animekai-jellyfin > /dev/null

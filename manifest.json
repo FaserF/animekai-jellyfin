@@ -6,7 +6,7 @@
     "overview": "Universal Anime Fan-Edits & Direct HLS Stream Integration with Zero-Torrent Privacy Protection.",
     "owner": "FaserF",
     "category": "Live TV & Streaming",
-    "imageUrl": "https://raw.githubusercontent.com/FaserF/rezero-jellyfin/main/Jellyfin.Plugin.AnimeKai/thumb.png",
+    "imageUrl": "https://raw.githubusercontent.com/FaserF/animekai-jellyfin/main/Jellyfin.Plugin.AnimeKai/thumb.png",
     "versions": [
       {
         "version": "0.1.1.0",
