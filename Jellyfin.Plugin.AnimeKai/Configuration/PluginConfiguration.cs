@@ -19,15 +19,23 @@ public class PluginConfiguration : BasePluginConfiguration
     public string DedicatedStoragePath { get; set; } = string.Empty;
 
     /// <summary>
+    /// Gets or sets a value indicating whether the dedicated anime storage root (e.g. /data/animekai)
+    /// should be automatically registered as a media path in Jellyfin's primary TV library ("Serien").
+    /// Eliminates the need for symlinks and MergerFS cross-filesystem overhead.
+    /// </summary>
+    public bool AutoRegisterLibraryPath { get; set; } = true;
+
+    /// <summary>
     /// Gets or sets the global default target TV library root folder (e.g. /data/tv on Google Drive / MergerFS pool)
-    /// where all active providers create show directories and symlinks. Leave blank to auto-detect the primary TV library.
+    /// where all active providers create show directories. Leave blank to use dedicated storage path.
     /// </summary>
     public string DefaultTargetLibraryPath { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets a value indicating whether dedicated local storage with symlinks is enabled.
+    /// Gets or sets a value indicating whether legacy symlinks into TV library are enabled.
+    /// Defaults to false in favor of direct dedicated library storage.
     /// </summary>
-    public bool EnableSymlink { get; set; } = true;
+    public bool EnableSymlink { get; set; } = false;
 
     /// <summary>
     /// Gets or sets a value indicating whether automated background synchronization is enabled.

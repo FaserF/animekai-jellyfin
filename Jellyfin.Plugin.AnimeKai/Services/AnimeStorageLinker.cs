@@ -23,6 +23,144 @@ internal static class AnimeStorageLinker
 {
     private static readonly Encoding Utf8WithoutBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
 
+    internal static bool EnsureStoragePathInLibrary(
+        ILibraryManager libraryManager,
+        string storageRoot,
+        ILogger logger)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(storageRoot))
+            {
+                return false;
+            }
+
+            Directory.CreateDirectory(storageRoot);
+
+            var virtualFolders = libraryManager.GetVirtualFolders() ?? new List<VirtualFolderInfo>();
+            var tvFolder = virtualFolders.FirstOrDefault(v =>
+                string.Equals(v.CollectionType?.ToString(), "tvshows", StringComparison.OrdinalIgnoreCase) &&
+                (string.Equals(v.Name, "Serien", StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(v.Name, "TV Shows", StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(v.Name, "Anime", StringComparison.OrdinalIgnoreCase)))
+                ?? virtualFolders.FirstOrDefault(v =>
+                    string.Equals(v.CollectionType?.ToString(), "tvshows", StringComparison.OrdinalIgnoreCase));
+
+            if (tvFolder == null)
+            {
+                logger.LogWarning("No TV shows library found to auto-register anime storage path {Path}", storageRoot);
+                return false;
+            }
+
+            var normalizedStorage = Path.TrimEndingDirectorySeparator(Path.GetFullPath(storageRoot));
+            var locations = tvFolder.Locations ?? Array.Empty<string>();
+            var exists = locations.Any(loc =>
+                !string.IsNullOrWhiteSpace(loc) &&
+                string.Equals(Path.TrimEndingDirectorySeparator(Path.GetFullPath(loc)), normalizedStorage, StringComparison.OrdinalIgnoreCase));
+
+            if (exists)
+            {
+                logger.LogDebug("Anime storage path {Path} is already registered in library {Library}", storageRoot, tvFolder.Name);
+                return true;
+            }
+
+            libraryManager.AddMediaPath(tvFolder.Name, new MediaBrowser.Model.Configuration.MediaPathInfo
+            {
+                Path = storageRoot
+            });
+
+            logger.LogInformation("Auto-registered dedicated anime storage path {Path} into TV library '{Library}'", storageRoot, tvFolder.Name);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Could not auto-register storage path {Path} into Jellyfin TV library", storageRoot);
+            return false;
+        }
+    }
+
+    internal static void CleanupLegacyTargetSymlinks(
+        ILibraryManager libraryManager,
+        string storageRoot,
+        ILogger logger)
+    {
+        try
+        {
+            var virtualFolders = libraryManager.GetVirtualFolders() ?? new List<VirtualFolderInfo>();
+            var normalizedStorage = Path.TrimEndingDirectorySeparator(Path.GetFullPath(storageRoot));
+
+            foreach (var vf in virtualFolders.Where(v => string.Equals(v.CollectionType?.ToString(), "tvshows", StringComparison.OrdinalIgnoreCase)))
+            {
+                foreach (var loc in vf.Locations ?? Array.Empty<string>())
+                {
+                    if (string.IsNullOrWhiteSpace(loc) || !Directory.Exists(loc)) continue;
+                    var normalizedLoc = Path.TrimEndingDirectorySeparator(Path.GetFullPath(loc));
+                    if (string.Equals(normalizedLoc, normalizedStorage, StringComparison.OrdinalIgnoreCase)) continue;
+
+                    // Clean Re:Zero Season 00 symlink from other library locations
+                    try
+                    {
+                        var rezeroDirs = Directory.GetDirectories(loc, "*Re*ZERO*", SearchOption.TopDirectoryOnly);
+                        foreach (var rDir in rezeroDirs)
+                        {
+                            var s00 = Path.Combine(rDir, "Season 00");
+                            if (Directory.Exists(s00))
+                            {
+                                var dirInfo = new DirectoryInfo(s00);
+                                if (dirInfo.LinkTarget != null || (dirInfo.Attributes & FileAttributes.ReparsePoint) != 0)
+                                {
+                                    Directory.Delete(s00, recursive: false);
+                                    logger.LogInformation("Removed legacy Season 00 symlink from {Path}", s00);
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogDebug(ex, "Could not clean Re:Zero legacy symlink in {Path}", loc);
+                    }
+
+                    // Clean standalone show folders in other locations if they contain symlinks
+                    var fanEditNames = new[] { "Naruto Kai", "Bleach Kai", "One Pace" };
+                    foreach (var showName in fanEditNames)
+                    {
+                        try
+                        {
+                            var candidate = Path.Combine(loc, showName);
+                            if (Directory.Exists(candidate))
+                            {
+                                var dirInfo = new DirectoryInfo(candidate);
+                                if (dirInfo.LinkTarget != null || (dirInfo.Attributes & FileAttributes.ReparsePoint) != 0)
+                                {
+                                    Directory.Delete(candidate, recursive: false);
+                                    logger.LogInformation("Removed legacy show symlink {Path}", candidate);
+                                }
+                                else
+                                {
+                                    var subEntries = Directory.GetFileSystemEntries(candidate);
+                                    var hasRealMedia = subEntries.Any(e => e.EndsWith(".mkv", StringComparison.OrdinalIgnoreCase) || e.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase));
+                                    if (!hasRealMedia)
+                                    {
+                                        Directory.Delete(candidate, recursive: true);
+                                        logger.LogInformation("Removed legacy symlink show folder {Path}", candidate);
+                                    }
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            logger.LogDebug(ex, "Could not clean legacy show folder {Show} in {Path}", showName, loc);
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "Legacy symlink cleanup completed with non-fatal notice.");
+        }
+    }
+
     internal static string? ResolveTargetTvLibraryRoot(
         PluginConfiguration config,
         ILibraryManager libraryManager,
@@ -68,83 +206,15 @@ internal static class AnimeStorageLinker
             return trimmed.EndsWith(showFolderName, StringComparison.OrdinalIgnoreCase) ? trimmed : Path.Combine(trimmed, showFolderName);
         }
 
-        var libRoot = ResolveTargetTvLibraryRoot(config, libraryManager);
-        return !string.IsNullOrWhiteSpace(libRoot) ? Path.Combine(libRoot, showFolderName) : Path.Combine(storageRoot, physicalSubfolder);
+        return Path.Combine(storageRoot, showFolderName);
     }
+
     internal static (string WriteDir, string? PerFileSymlinkDir) EnsureStorageLayout(
         string targetDir,
         string physicalDir,
         bool useSymlink,
         ILogger logger)
     {
-        if (!useSymlink || IsSameOrNestedPath(targetDir, physicalDir))
-        {
-            Directory.CreateDirectory(targetDir);
-            return (targetDir, null);
-        }
-
-        Directory.CreateDirectory(physicalDir);
-
-        try
-        {
-            var targetInfo = new DirectoryInfo(targetDir);
-            var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
-            if (targetInfo.LinkTarget != null)
-            {
-                var targetParent = Path.GetDirectoryName(targetDir) ?? Path.GetPathRoot(targetDir) ?? string.Empty;
-                var resolvedExisting = Path.TrimEndingDirectorySeparator(Path.GetFullPath(targetInfo.LinkTarget, targetParent));
-                var normalizedPhysical = Path.TrimEndingDirectorySeparator(Path.GetFullPath(physicalDir));
-                if (string.Equals(resolvedExisting, normalizedPhysical, comparison))
-                {
-                    return (physicalDir, null);
-                }
-
-                Directory.Delete(targetDir, recursive: false);
-                Directory.CreateSymbolicLink(targetDir, physicalDir);
-                logger.LogInformation("Updated directory symlink {Target} -> {Physical}", targetDir, physicalDir);
-                return (physicalDir, null);
-            }
-
-            if (!Directory.Exists(targetDir) && !File.Exists(targetDir))
-            {
-                Directory.CreateSymbolicLink(targetDir, physicalDir);
-                logger.LogInformation("Created directory symlink {Target} -> {Physical}", targetDir, physicalDir);
-                return (physicalDir, null);
-            }
-
-            if (Directory.Exists(targetDir))
-            {
-                var entries = Directory.EnumerateFileSystemEntries(targetDir).ToList();
-                if (entries.Count == 0)
-                {
-                    Directory.Delete(targetDir, recursive: false);
-                    Directory.CreateSymbolicLink(targetDir, physicalDir);
-                    logger.LogInformation("Replaced empty directory with symlink {Target} -> {Physical}", targetDir, physicalDir);
-                    return (physicalDir, null);
-                }
-
-                if (entries.All(e => !Directory.Exists(e) && IsGeneratedPointerOrNfo(e)))
-                {
-                    foreach (var entry in entries)
-                    {
-                        File.Delete(entry);
-                    }
-
-                    Directory.Delete(targetDir, recursive: false);
-                    Directory.CreateSymbolicLink(targetDir, physicalDir);
-                    logger.LogInformation("Migrated existing stream folder to symlink {Target} -> {Physical}", targetDir, physicalDir);
-                    return (physicalDir, null);
-                }
-
-                logger.LogInformation("Existing files preserved in {Target}; linking files individually from {Physical}", targetDir, physicalDir);
-                return (physicalDir, targetDir);
-            }
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Could not create symlink {Target} -> {Physical}; falling back to direct writes.", targetDir, physicalDir);
-        }
-
         Directory.CreateDirectory(targetDir);
         return (targetDir, null);
     }
@@ -280,50 +350,8 @@ internal static class AnimeStorageLinker
         IEnumerable<string>? genres = null,
         string? studio = null,
         string? posterUrl = null,
-        string? tvdbId = null)
-    {
-        var elements = new List<object>
-        {
-            new XElement("title", title),
-            new XElement("originaltitle", originalTitle ?? title),
-            new XElement("showtitle", title),
-            new XElement("plot", plot),
-            new XElement("studio", studio ?? "Anime Kai & Fan-Edits"),
-            new XElement("status", "Continuing"),
-            new XElement("lockdata", "true")
-        };
-
-        if (!string.IsNullOrWhiteSpace(tvdbId))
-        {
-            elements.Add(new XElement("uniqueid", new XAttribute("type", "tvdb"), new XAttribute("default", "true"), tvdbId));
-            elements.Add(new XElement("tvdbid", tvdbId));
-        }
-
-        if (genres != null)
-        {
-            foreach (var g in genres)
-            {
-                elements.Add(new XElement("genre", g));
-            }
-        }
-        else
-        {
-            elements.Add(new XElement("genre", "Animation"));
-            elements.Add(new XElement("genre", "Anime"));
-            elements.Add(new XElement("genre", "Action"));
-        }
-
-        if (IsValidImageUrl(posterUrl))
-        {
-            elements.Add(new XElement("thumb", new XAttribute("aspect", "poster"), posterUrl));
-        }
-
-        var doc = new XDocument(
-            new XDeclaration("1.0", "utf-8", "yes"),
-            new XElement("tvshow", elements));
-
-        return doc.Declaration + Environment.NewLine + doc;
-    }
+        string? tvdbId = null) =>
+        AnimeNfoBuilder.BuildTvShowNfo(title, plot, originalTitle, genres, studio, posterUrl, tvdbId);
 
     internal static string BuildEpisodeNfo(
         string title,
@@ -338,81 +366,11 @@ internal static class AnimeStorageLinker
         int? introEnd = null,
         int? outroStart = null,
         int? outroEnd = null,
-        string? mangaChapters = null)
-    {
-        var streamDetails = new XElement("streamdetails",
-            new XElement("video",
-                new XElement("codec", "h264"),
-                new XElement("width", "1920"),
-                new XElement("height", "1080"),
-                new XElement("aspect", "16:9")),
-            new XElement("audio",
-                new XElement("codec", "aac"),
-                new XElement("language", lang),
-                new XElement("channels", "2")));
+        string? mangaChapters = null) =>
+        AnimeNfoBuilder.BuildEpisodeNfo(title, showTitle, seasonNumber, episodeNumber, plot, thumbUrl, lang, hasSubtitles, introStart, introEnd, outroStart, outroEnd, mangaChapters);
 
-        if (hasSubtitles)
-        {
-            streamDetails.Add(new XElement("subtitle",
-                new XElement("language", "eng"),
-                new XElement("forced", "true")));
-        }
-
-        var elements = new List<object>
-        {
-            new XElement("title", title),
-            new XElement("originaltitle", title),
-            new XElement("showtitle", showTitle),
-            new XElement("season", seasonNumber),
-            new XElement("episode", episodeNumber),
-            new XElement("plot", plot ?? string.Empty),
-            new XElement("lockdata", "true")
-        };
-
-        if (!string.IsNullOrWhiteSpace(mangaChapters))
-        {
-            elements.Add(new XElement("tag", $"Manga Chapters: {mangaChapters}"));
-        }
-
-        if (IsValidImageUrl(thumbUrl))
-        {
-            elements.Add(new XElement("thumb", thumbUrl));
-        }
-
-        if (introStart.HasValue && introEnd.HasValue)
-        {
-            elements.Add(new XElement("intro",
-                new XElement("start", introStart.Value),
-                new XElement("end", introEnd.Value)));
-        }
-
-        if (outroStart.HasValue && outroEnd.HasValue)
-        {
-            elements.Add(new XElement("outro",
-                new XElement("start", outroStart.Value),
-                new XElement("end", outroEnd.Value)));
-        }
-
-        elements.Add(new XElement("fileinfo", streamDetails));
-
-        var doc = new XDocument(
-            new XDeclaration("1.0", "utf-8", "yes"),
-            new XElement("episodedetails", elements));
-
-        return doc.Declaration + Environment.NewLine + doc;
-    }
-
-    internal static string BuildSeasonNfo(string title, int seasonNumber, string? plot = null)
-    {
-        var doc = new XDocument(
-            new XDeclaration("1.0", "utf-8", "yes"),
-            new XElement("season",
-                new XElement("title", title),
-                new XElement("seasonnumber", seasonNumber),
-                new XElement("plot", plot ?? string.Empty),
-                new XElement("lockdata", "true")));
-        return doc.Declaration + Environment.NewLine + doc;
-    }
+    internal static string BuildSeasonNfo(string title, int seasonNumber, string? plot = null) =>
+        AnimeNfoBuilder.BuildSeasonNfo(title, seasonNumber, plot);
 
     internal static async Task SanitizeSpecialsPlacementAsync(
         ILibraryManager libraryManager,
@@ -529,29 +487,4 @@ internal static class AnimeStorageLinker
         }
     }
 
-    private static bool IsValidImageUrl(string? url)
-    {
-        if (string.IsNullOrWhiteSpace(url))
-        {
-            return false;
-        }
-
-        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
-        {
-            return false;
-        }
-
-        if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
-        {
-            return false;
-        }
-
-        if (url.Contains("archive.org/download/") ||
-            url.Contains("onepace.net/images/"))
-        {
-            return false;
-        }
-
-        return true;
-    }
 }

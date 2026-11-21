@@ -139,8 +139,7 @@ public class ConsumetStreamProvider : IAnimeStreamProvider
 
         var provider = string.IsNullOrWhiteSpace(config.ConsumetProvider) ? "gogoanime" : config.ConsumetProvider.ToLowerInvariant();
         var targetBaseDir = ResolveTargetDirectory(config, context.StorageRoot);
-        var physicalBaseDir = Path.Combine(context.StorageRoot, "Streams");
-        Directory.CreateDirectory(physicalBaseDir);
+        Directory.CreateDirectory(targetBaseDir);
 
         var totalSynced = 0;
         for (var i = 0; i < shows.Length; i++)
@@ -174,9 +173,6 @@ public class ConsumetStreamProvider : IAnimeStreamProvider
                 var showTitle = info.GetPrimaryTitle();
                 var safeTitle = Sanitize(showTitle);
                 var targetShowDir = Path.Combine(targetBaseDir, safeTitle);
-                var physicalShowDir = Path.Combine(physicalBaseDir, safeTitle);
-
-                Directory.CreateDirectory(physicalShowDir);
                 Directory.CreateDirectory(targetShowDir);
 
                 // tvshow.nfo
@@ -189,22 +185,12 @@ public class ConsumetStreamProvider : IAnimeStreamProvider
                         genres: info.Genres,
                         posterUrl: info.Image ?? info.Cover);
                     await AnimeStorageLinker.WriteIfChangedAsync(tvshowNfo, content, cancellationToken).ConfigureAwait(false);
-                    if (!string.Equals(physicalShowDir, targetShowDir, StringComparison.OrdinalIgnoreCase))
-                    {
-                        var physNfo = Path.Combine(physicalShowDir, "tvshow.nfo");
-                        await AnimeStorageLinker.WriteIfChangedAsync(physNfo, content, cancellationToken).ConfigureAwait(false);
-                    }
                 }
 
                 var seasonFolder = "Season 01";
                 var targetSeasonDir = Path.Combine(targetShowDir, seasonFolder);
-                var physicalSeasonDir = Path.Combine(physicalShowDir, seasonFolder);
-
-                var (writeDir, perFileSymlinkDir) = AnimeStorageLinker.EnsureStorageLayout(
-                    targetSeasonDir,
-                    physicalSeasonDir,
-                    context.UseSymlink,
-                    _logger);
+                Directory.CreateDirectory(targetSeasonDir);
+                var writeDir = targetSeasonDir;
 
                 foreach (var ep in info.Episodes)
                 {
@@ -234,12 +220,6 @@ public class ConsumetStreamProvider : IAnimeStreamProvider
                         ep.Image ?? info.Image);
 
                     await AnimeStorageLinker.WriteIfChangedAsync(nfoFile, epNfo, cancellationToken).ConfigureAwait(false);
-
-                    if (!string.IsNullOrWhiteSpace(perFileSymlinkDir))
-                    {
-                        AnimeStorageLinker.EnsureFileSymlink(Path.Combine(perFileSymlinkDir, $"{fileNameBase}.strm"), strmFile, _logger);
-                        AnimeStorageLinker.EnsureFileSymlink(Path.Combine(perFileSymlinkDir, $"{fileNameBase}.nfo"), nfoFile, _logger);
-                    }
 
                     totalSynced++;
                 }

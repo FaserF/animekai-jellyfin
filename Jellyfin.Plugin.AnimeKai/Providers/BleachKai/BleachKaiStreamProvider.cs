@@ -58,8 +58,6 @@ public class BleachKaiStreamProvider : IAnimeStreamProvider
         _logger.LogInformation("Starting Bleach Kai sync...");
 
         var showDir = ResolveShowDirectory(config, context.StorageRoot);
-        var physicalShowDir = Path.Combine(context.StorageRoot, "BleachKai");
-        Directory.CreateDirectory(physicalShowDir);
         Directory.CreateDirectory(showDir);
 
         // tvshow.nfo
@@ -74,11 +72,6 @@ public class BleachKaiStreamProvider : IAnimeStreamProvider
             null,
             tvdbId: "74796");
         await AnimeStorageLinker.WriteIfChangedAsync(tvshowNfo, content, cancellationToken).ConfigureAwait(false);
-        if (!string.Equals(physicalShowDir, showDir, StringComparison.OrdinalIgnoreCase))
-        {
-            var physNfo = Path.Combine(physicalShowDir, "tvshow.nfo");
-            await AnimeStorageLinker.WriteIfChangedAsync(physNfo, content, cancellationToken).ConfigureAwait(false);
-        }
 
         // Download official artwork from TVDB
         await AnimeStorageLinker.DownloadArtworkAsync(_httpClient, "https://artworks.thetvdb.com/banners/posters/74796-1.jpg", Path.Combine(showDir, "poster.jpg"), _logger, cancellationToken).ConfigureAwait(false);
@@ -86,14 +79,9 @@ public class BleachKaiStreamProvider : IAnimeStreamProvider
         await AnimeStorageLinker.DownloadArtworkAsync(_httpClient, "https://artworks.thetvdb.com/banners/fanart/original/74796-1.jpg", Path.Combine(showDir, "backdrop.jpg"), _logger, cancellationToken).ConfigureAwait(false);
 
         var volumes = GetVolumes();
-        var targetSeasonDir = Path.Combine(showDir, "Season 01");
-        var physicalSeasonDir = Path.Combine(physicalShowDir, "Season 01");
-
-        var (writeDir, perFileSymlinkDir) = AnimeStorageLinker.EnsureStorageLayout(
-            targetSeasonDir,
-            physicalSeasonDir,
-            context.UseSymlink,
-            _logger);
+        var seasonDir = Path.Combine(showDir, "Season 01");
+        Directory.CreateDirectory(seasonDir);
+        var writeDir = seasonDir;
 
         var total = 0;
         for (var i = 0; i < volumes.Count; i++)
@@ -125,12 +113,6 @@ public class BleachKaiStreamProvider : IAnimeStreamProvider
                 mangaChapters: vol.Chapters);
 
             await AnimeStorageLinker.WriteIfChangedAsync(nfoFile, epNfo, cancellationToken).ConfigureAwait(false);
-
-            if (!string.IsNullOrWhiteSpace(perFileSymlinkDir))
-            {
-                AnimeStorageLinker.EnsureFileSymlink(Path.Combine(perFileSymlinkDir, $"{fileNameBase}.strm"), strmFile, _logger);
-                AnimeStorageLinker.EnsureFileSymlink(Path.Combine(perFileSymlinkDir, $"{fileNameBase}.nfo"), nfoFile, _logger);
-            }
 
             total++;
             progress?.Report((double)(i + 1) / volumes.Count * 100.0);

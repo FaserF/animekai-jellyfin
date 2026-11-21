@@ -105,6 +105,7 @@ public class AnimeController : ControllerBase
         {
             StorageRoot = storageRoot,
             DedicatedStoragePath = Config.DedicatedStoragePath,
+            AutoRegisterLibraryPath = Config.AutoRegisterLibraryPath,
             DefaultTargetLibraryPath = Config.DefaultTargetLibraryPath,
             ResolvedTargetLibraryPath = targetLibraryRoot,
             EnableSymlink = Config.EnableSymlink,

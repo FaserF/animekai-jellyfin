@@ -54,24 +54,24 @@
 
                         <div class="checkboxContainer checkboxContainer-withDescription">
                             <label class="emby-checkbox-label">
-                                <input is="emby-checkbox" type="checkbox" id="chkEnableSymlink" name="EnableSymlink" />
-                                <span>Enable Dedicated Fast Storage / Symlink Offloading</span>
+                                <input is="emby-checkbox" type="checkbox" id="chkAutoRegisterLibraryPath" name="AutoRegisterLibraryPath" />
+                                <span>Auto-Register Storage Folder into Jellyfin TV Library ("Serien")</span>
                             </label>
                             <div class="fieldDescription checkboxFieldDescription">
-                                Automatically detects fast NVMe/SSD mount points (or custom path) and creates symlinks into your Jellyfin TV folders to protect network or root storage.
+                                Automatically registers the dedicated storage path directly into your Jellyfin TV library (e.g. "Serien") as an additional media location. Completely eliminates symlinks and cloud-mount latency while seamlessly merging multi-season anime.
                             </div>
                         </div>
 
                         <div class="inputContainer" id="containerDedicatedStorage">
-                            <label class="inputLabel inputLabelUnfocused" for="txtDedicatedStoragePath">Dedicated Physical Storage Path (Optional)</label>
+                            <label class="inputLabel inputLabelUnfocused" for="txtDedicatedStoragePath">Dedicated Storage Root Path</label>
                             <input is="emby-input" type="text" id="txtDedicatedStoragePath" name="DedicatedStoragePath" class="emby-input" placeholder="/data/animekai" />
-                            <div class="fieldDescription">Fast local NVMe/SSD directory where physical .strm and .nfo files are stored (default: /data/animekai).</div>
+                            <div class="fieldDescription">Fast local NVMe/SSD directory where all fan-edit shows, .strm, .nfo and artwork are directly saved (default: /data/animekai). Zero symlinks needed.</div>
                         </div>
 
-                        <div class="inputContainer" id="containerDefaultTargetLibrary">
-                            <label class="inputLabel inputLabelUnfocused" for="txtDefaultTargetLibraryPath">Global Target TV Library Path (GDrive Pool / Primary TV Folder)</label>
+                        <div class="inputContainer" id="containerDefaultTargetLibrary" style="display: none;">
+                            <label class="inputLabel inputLabelUnfocused" for="txtDefaultTargetLibraryPath">Legacy Target TV Library Path (Optional Override)</label>
                             <input is="emby-input" type="text" id="txtDefaultTargetLibraryPath" name="DefaultTargetLibraryPath" class="emby-input" placeholder="/data/tv" />
-                            <div class="fieldDescription">Global target TV library root (e.g. /data/tv on your Google Drive / MergerFS pool) where all enabled providers (Re:Zero, One Pace, Naruto Kai, Bleach Kai) create their show folders and symlinks. Leave blank to auto-detect your primary "Serien" / "TV Shows" library.</div>
+                            <div class="fieldDescription">Optional override. By default, the plugin stores all shows in the Dedicated Storage Root and auto-registers it in the library.</div>
                         </div>
                     </div>
 
@@ -349,7 +349,7 @@
                     page.querySelector("#chkOfferAllQualitiesInPlayer").checked = config.OfferAllQualitiesInPlayer !== false;
                     page.querySelector("#chkEnableAutoSync").checked = config.EnableAutoSync !== false;
                     page.querySelector("#txtSyncIntervalHours").value = config.SyncIntervalHours || 12;
-                    page.querySelector("#chkEnableSymlink").checked = config.EnableSymlink !== false;
+                    page.querySelector("#chkAutoRegisterLibraryPath").checked = config.AutoRegisterLibraryPath !== false;
                     page.querySelector("#txtDedicatedStoragePath").value = config.DedicatedStoragePath || "";
                     page.querySelector("#txtDefaultTargetLibraryPath").value = config.DefaultTargetLibraryPath || "";
 
@@ -467,7 +467,7 @@
                         config.OfferAllQualitiesInPlayer = page.querySelector("#chkOfferAllQualitiesInPlayer").checked;
                         config.EnableAutoSync = page.querySelector("#chkEnableAutoSync").checked;
                         config.SyncIntervalHours = parseInt(page.querySelector("#txtSyncIntervalHours").value, 10) || 12;
-                        config.EnableSymlink = page.querySelector("#chkEnableSymlink").checked;
+                        config.AutoRegisterLibraryPath = page.querySelector("#chkAutoRegisterLibraryPath").checked;
                         config.DedicatedStoragePath = page.querySelector("#txtDedicatedStoragePath").value.trim();
                         config.DefaultTargetLibraryPath = page.querySelector("#txtDefaultTargetLibraryPath").value.trim();
 

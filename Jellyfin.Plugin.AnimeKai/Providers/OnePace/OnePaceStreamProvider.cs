@@ -113,28 +113,23 @@ public class OnePaceStreamProvider : IAnimeStreamProvider
         }
 
         var showDir = ResolveShowDirectory(config, context.StorageRoot);
-        var physicalShowDir = Path.Combine(context.StorageRoot, "OnePace");
-        Directory.CreateDirectory(physicalShowDir);
         Directory.CreateDirectory(showDir);
 
         // Ensure tvshow.nfo
         var tvshowNfo = Path.Combine(showDir, "tvshow.nfo");
-        if (!File.Exists(tvshowNfo))
-        {
-            var nfoContent = AnimeStorageLinker.BuildTvShowNfo(
-                "One Pace",
-                "One Pace is a fan-edit project that condenses the One Piece anime to more closely match Eiichiro Oda's original manga. By cutting out filler scenes, recaps, and slow-paced padding, One Pace preserves the story's intended rhythm.",
-                "ONE PIECE (One Pace Cut)",
-                new[] { "Animation", "Anime", "Action", "Adventure", "Comedy", "Fantasy" },
-                "One Pace Team",
-                null);
-            await File.WriteAllTextAsync(tvshowNfo, nfoContent, cancellationToken).ConfigureAwait(false);
-            if (!string.Equals(physicalShowDir, showDir, StringComparison.OrdinalIgnoreCase))
-            {
-                var physNfo = Path.Combine(physicalShowDir, "tvshow.nfo");
-                await File.WriteAllTextAsync(physNfo, nfoContent, cancellationToken).ConfigureAwait(false);
-            }
-        }
+        var nfoContent = AnimeStorageLinker.BuildTvShowNfo(
+            "One Pace",
+            "One Pace is a fan-edit project that condenses the One Piece anime to more closely match Eiichiro Oda's original manga. By cutting out filler scenes, recaps, and slow-paced padding, One Pace preserves the story's intended rhythm.",
+            "ONE PIECE (One Pace Cut)",
+            new[] { "Animation", "Anime", "Action", "Adventure", "Comedy", "Fantasy" },
+            "One Pace Team",
+            null);
+        await AnimeStorageLinker.WriteIfChangedAsync(tvshowNfo, nfoContent, cancellationToken).ConfigureAwait(false);
+
+        // Download official One Pace / One Piece artwork
+        await AnimeStorageLinker.DownloadArtworkAsync(_httpClient, "https://artworks.thetvdb.com/banners/posters/81797-1.jpg", Path.Combine(showDir, "poster.jpg"), _logger, cancellationToken).ConfigureAwait(false);
+        await AnimeStorageLinker.DownloadArtworkAsync(_httpClient, "https://artworks.thetvdb.com/banners/graphical/81797-g.jpg", Path.Combine(showDir, "banner.jpg"), _logger, cancellationToken).ConfigureAwait(false);
+        await AnimeStorageLinker.DownloadArtworkAsync(_httpClient, "https://artworks.thetvdb.com/banners/fanart/original/81797-1.jpg", Path.Combine(showDir, "backdrop.jpg"), _logger, cancellationToken).ConfigureAwait(false);
 
         var totalEpisodes = 0;
         var arcIndex = 1;
@@ -147,13 +142,8 @@ public class OnePaceStreamProvider : IAnimeStreamProvider
             var seasonFolderName = $"Season {seasonNumber:D2}";
 
             var targetSeasonDir = Path.Combine(showDir, seasonFolderName);
-            var physicalSeasonDir = Path.Combine(physicalShowDir, seasonFolderName);
-
-            var (writeDir, perFileSymlinkDir) = AnimeStorageLinker.EnsureStorageLayout(
-                targetSeasonDir,
-                physicalSeasonDir,
-                context.UseSymlink,
-                _logger);
+            Directory.CreateDirectory(targetSeasonDir);
+            var writeDir = targetSeasonDir;
 
             foreach (var ep in arc.Episodes)
             {
@@ -172,8 +162,15 @@ public class OnePaceStreamProvider : IAnimeStreamProvider
 
                 await AnimeStorageLinker.WriteIfChangedAsync(strmFile, streamUrl, cancellationToken).ConfigureAwait(false);
 
+                var cleanEpTitle = Regex.Replace(ep.Title, @"^One\s*Pace\s*-\s*S\d+E\d+\s*-\s*(\[[^\]]+\]\s*)?", string.Empty, RegexOptions.IgnoreCase).Trim();
+                cleanEpTitle = Regex.Replace(cleanEpTitle, @"^\d+[\s: ]+", string.Empty).Trim();
+                if (string.IsNullOrWhiteSpace(cleanEpTitle))
+                {
+                    cleanEpTitle = $"Episode {ep.Number}";
+                }
+
                 var epNfo = AnimeStorageLinker.BuildEpisodeNfo(
-                    $"{ep.Title} - [{arc.Title}]",
+                    $"{cleanEpTitle} - [{arc.Title}]",
                     "One Pace",
                     seasonNumber,
                     ep.Number,
@@ -184,12 +181,6 @@ public class OnePaceStreamProvider : IAnimeStreamProvider
                     mangaChapters: ep.MangaChapters);
 
                 await AnimeStorageLinker.WriteIfChangedAsync(nfoFile, epNfo, cancellationToken).ConfigureAwait(false);
-
-                if (!string.IsNullOrWhiteSpace(perFileSymlinkDir))
-                {
-                    AnimeStorageLinker.EnsureFileSymlink(Path.Combine(perFileSymlinkDir, $"{fileNameBase}.strm"), strmFile, _logger);
-                    AnimeStorageLinker.EnsureFileSymlink(Path.Combine(perFileSymlinkDir, $"{fileNameBase}.nfo"), nfoFile, _logger);
-                }
 
                 totalEpisodes++;
             }

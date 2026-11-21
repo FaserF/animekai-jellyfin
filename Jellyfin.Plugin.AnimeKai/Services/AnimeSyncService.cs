@@ -54,6 +54,13 @@ public class AnimeSyncService : IAnimeSyncService
             return new OverallSyncResult(true, 0, new List<ProviderSyncResult>(), "No providers currently enabled.");
         }
 
+        if (config.AutoRegisterLibraryPath)
+        {
+            AnimeStorageLinker.EnsureStoragePathInLibrary(_libraryManager, storageRoot, _logger);
+        }
+
+        AnimeStorageLinker.CleanupLegacyTargetSymlinks(_libraryManager, storageRoot, _logger);
+
         var results = new List<ProviderSyncResult>();
         var totalEpisodes = 0;
         var hasFailures = false;

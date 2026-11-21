@@ -73,14 +73,9 @@ public class RezeroStreamProvider : IAnimeStreamProvider
         }
 
         var showDir = ResolveShowDirectory(config, context.StorageRoot);
-        var physicalSeasonDir = Path.Combine(context.StorageRoot, "ReZero", config.SeasonFolder);
-        var targetSeasonDir = Path.Combine(showDir, config.SeasonFolder);
-
-        var (writeDir, perFileSymlinkDir) = AnimeStorageLinker.EnsureStorageLayout(
-            targetSeasonDir,
-            physicalSeasonDir,
-            context.UseSymlink,
-            _logger);
+        var seasonDir = Path.Combine(showDir, config.SeasonFolder);
+        Directory.CreateDirectory(seasonDir);
+        var writeDir = seasonDir;
 
         // Lock season.nfo so TVDB never maps Season 00 episodes to Break Time specials
         var seasonNfo = Path.Combine(writeDir, "season.nfo");
@@ -89,26 +84,25 @@ public class RezeroStreamProvider : IAnimeStreamProvider
             config.SeasonNumber,
             "Chronological narrative fan re-cut of Re:Zero - Starting Life in Another World (Arcs 1-6).");
         await AnimeStorageLinker.WriteIfChangedAsync(seasonNfo, seasonNfoContent, cancellationToken).ConfigureAwait(false);
-        if (!string.IsNullOrWhiteSpace(perFileSymlinkDir))
-        {
-            AnimeStorageLinker.EnsureFileSymlink(Path.Combine(perFileSymlinkDir, "season.nfo"), seasonNfo, _logger);
-        }
 
-        // tvshow.nfo if standalone
-        if (string.Equals(config.IntegrationMode, "StandaloneSeries", StringComparison.OrdinalIgnoreCase))
+        // tvshow.nfo
+        var tvshowNfo = Path.Combine(showDir, "tvshow.nfo");
+        if (!File.Exists(tvshowNfo))
         {
-            var tvshowNfo = Path.Combine(showDir, "tvshow.nfo");
-            if (!File.Exists(tvshowNfo))
-            {
-                var content = AnimeStorageLinker.BuildTvShowNfo(
-                    config.StandaloneSeriesTitle,
-                    "A seamless chronological recut of Re:Zero - Starting Life in Another World without commercial breaks, duplicate scenes, or pacing bloat.",
-                    "Re:Zero - The Perfect Run",
-                    new[] { "Animation", "Anime", "Fantasy", "Drama", "Psychological", "Thriller" },
-                    "White Fox / Perfect Run Team",
-                    "https://rezeroperfect.run/juicy_prototype/images/arc1.jpg");
-                await AnimeStorageLinker.WriteIfChangedAsync(tvshowNfo, content, cancellationToken).ConfigureAwait(false);
-            }
+            var isStandalone = string.Equals(config.IntegrationMode, "StandaloneSeries", StringComparison.OrdinalIgnoreCase);
+            var title = isStandalone ? config.StandaloneSeriesTitle : "Re: ZERO, Starting Life in Another World";
+            var desc = isStandalone
+                ? "A seamless chronological recut of Re:Zero - Starting Life in Another World without commercial breaks, duplicate scenes, or pacing bloat."
+                : "Shortly after being summoned to a new world, Subaru Natsuki and his new female companion are brutally murdered. But then he awakes to find himself in the same alley, with the same thugs, the same girl, and the day begins to repeat.";
+            var content = AnimeStorageLinker.BuildTvShowNfo(
+                title,
+                desc,
+                isStandalone ? "Re:Zero - The Perfect Run" : "Re：ゼロから始める異世界生活",
+                new[] { "Animation", "Anime", "Fantasy", "Drama", "Psychological", "Thriller" },
+                "White Fox",
+                isStandalone ? "https://rezeroperfect.run/juicy_prototype/images/arc1.jpg" : null,
+                "305089");
+            await AnimeStorageLinker.WriteIfChangedAsync(tvshowNfo, content, cancellationToken).ConfigureAwait(false);
         }
 
         var total = 0;
@@ -140,7 +134,7 @@ public class RezeroStreamProvider : IAnimeStreamProvider
                     var dlResult = await _downloadService.DownloadEpisodeAsync(dlUrl, destMp4, config.SkipExistingDownloads, cancellationToken).ConfigureAwait(false);
                     if (dlResult.Succeeded && config.CleanOppositeModeFiles)
                     {
-                        AnimeStorageLinker.TryDeleteOppositeStrm(writeDir, perFileSymlinkDir, fileNameBase);
+                        AnimeStorageLinker.TryDeleteOppositeStrm(writeDir, null, fileNameBase);
                     }
                 }
                 else
@@ -172,14 +166,6 @@ public class RezeroStreamProvider : IAnimeStreamProvider
 
                 await AnimeStorageLinker.WriteIfChangedAsync(nfoFile, epNfo, cancellationToken).ConfigureAwait(false);
 
-                if (!string.IsNullOrWhiteSpace(perFileSymlinkDir))
-                {
-                    var ext = isDownload ? ".mp4" : ".strm";
-                    var mediaTarget = isDownload ? Path.Combine(writeDir, $"{fileNameBase}.mp4") : Path.Combine(writeDir, $"{fileNameBase}.strm");
-                    AnimeStorageLinker.EnsureFileSymlink(Path.Combine(perFileSymlinkDir, $"{fileNameBase}{ext}"), mediaTarget, _logger);
-                    AnimeStorageLinker.EnsureFileSymlink(Path.Combine(perFileSymlinkDir, $"{fileNameBase}.nfo"), nfoFile, _logger);
-                }
-
                 total++;
                 globalIndex++;
             }
@@ -187,7 +173,7 @@ public class RezeroStreamProvider : IAnimeStreamProvider
             progress?.Report((double)(i + 1) / videosResponse.Arcs.Count * 100.0);
         }
 
-        await AnimeStorageLinker.SanitizeSpecialsPlacementAsync(_libraryManager, targetSeasonDir, physicalSeasonDir, _logger, cancellationToken).ConfigureAwait(false);
+        await AnimeStorageLinker.SanitizeSpecialsPlacementAsync(_libraryManager, seasonDir, seasonDir, _logger, cancellationToken).ConfigureAwait(false);
 
         _logger.LogInformation("Re:Zero sync completed: {Count} episodes.", total);
         return new ProviderSyncResult(ProviderId, DisplayName, true, total, $"Synchronized {total} Re:Zero episodes.");
@@ -406,8 +392,8 @@ public class RezeroStreamProvider : IAnimeStreamProvider
     {
         if (string.Equals(config.IntegrationMode, "StandaloneSeries", StringComparison.OrdinalIgnoreCase))
         {
-            var title = string.IsNullOrWhiteSpace(config.StandaloneSeriesTitle) ? "ReZero - The Perfect Run" : Sanitize(config.StandaloneSeriesTitle);
-            return AnimeStorageLinker.ResolveShowDirectory(config, _libraryManager, title, config.StandaloneLibraryPath, storageRoot, "ReZero");
+            var title = string.IsNullOrWhiteSpace(config.StandaloneSeriesTitle) ? "Re:Zero - The Perfect Run" : Sanitize(config.StandaloneSeriesTitle);
+            return Path.Combine(storageRoot, title);
         }
 
         if (!string.IsNullOrWhiteSpace(config.TargetSeriesPath) && Directory.Exists(config.TargetSeriesPath))
@@ -415,29 +401,7 @@ public class RezeroStreamProvider : IAnimeStreamProvider
             return config.TargetSeriesPath;
         }
 
-        var primaryRoot = AnimeStorageLinker.ResolveTargetTvLibraryRoot(config, _libraryManager);
-        if (!string.IsNullOrWhiteSpace(primaryRoot) && Directory.Exists(primaryRoot))
-        {
-            var primaryCandidates = Directory.GetDirectories(primaryRoot, "*Re*ZERO*", SearchOption.TopDirectoryOnly);
-            if (primaryCandidates.Length > 0)
-            {
-                return primaryCandidates[0];
-            }
-        }
-
-        var virtualFolders = _libraryManager.GetVirtualFolders() ?? new List<VirtualFolderInfo>();
-        var tvFolders = virtualFolders.Where(f => string.Equals(f.CollectionType?.ToString(), "tvshows", StringComparison.OrdinalIgnoreCase)).SelectMany(f => f.Locations).ToList();
-        foreach (var folder in tvFolders)
-        {
-            if (!Directory.Exists(folder)) continue;
-            var candidates = Directory.GetDirectories(folder, "*Re*ZERO*", SearchOption.TopDirectoryOnly);
-            if (candidates.Length > 0)
-            {
-                return candidates[0];
-            }
-        }
-
-        return Path.Combine(storageRoot, "ReZero");
+        return Path.Combine(storageRoot, "Re - ZERO, Starting Life in Another World");
     }
 
     private static string Sanitize(string name)
