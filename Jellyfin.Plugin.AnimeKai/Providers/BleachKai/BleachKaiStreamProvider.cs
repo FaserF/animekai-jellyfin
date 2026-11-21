@@ -102,9 +102,10 @@ public class BleachKaiStreamProvider : IAnimeStreamProvider
             var vol = volumes[i];
             var isDub = string.Equals(config.BleachKaiLanguage, "dub", StringComparison.OrdinalIgnoreCase);
             var langTag = isDub ? "Dub" : "Sub";
+            var apiBase = (string.IsNullOrWhiteSpace(config.ConsumetApiUrl) ? "http://consumet-proxy:3000" : config.ConsumetApiUrl).TrimEnd('/');
             var streamUrl = !string.IsNullOrWhiteSpace(config.BleachKaiBaseStreamUrl)
                 ? $"{config.BleachKaiBaseStreamUrl.TrimEnd('/')}/Bleach_Kai_Vol_{vol.VolumeNumber:D2}_{langTag}.mp4"
-                : $"https://archive.org/download/bleach-kai-vol-{vol.VolumeNumber:D2}/Bleach_Kai_Vol_{vol.VolumeNumber:D2}_{langTag}.mp4";
+                : $"{apiBase}/anime/bleachkai/stream/{vol.VolumeNumber}/master.m3u8";
 
             var fileNameBase = $"Bleach Kai - S01E{vol.VolumeNumber:D2} - [Vol {vol.VolumeNumber:D2}] {Sanitize(vol.Title)}";
             var strmFile = Path.Combine(writeDir, $"{fileNameBase}.strm");
@@ -160,19 +161,20 @@ public class BleachKaiStreamProvider : IAnimeStreamProvider
             try
             {
                 var strmUrl = File.ReadAllText(path).Trim();
+                var isHls = strmUrl.EndsWith(".m3u8", StringComparison.OrdinalIgnoreCase) || strmUrl.Contains("/master.m3u8", StringComparison.OrdinalIgnoreCase);
                 sources.Add(new MediaSourceInfo
                 {
                     Id = $"{item.Id:N}_direct",
-                    Name = "Direct Stream (Archive / Cloud Mirror)",
+                    Name = isHls ? "Adaptive HLS (Consumet Gateway)" : "Direct Stream (Archive / Cloud Mirror)",
                     Path = strmUrl,
                     Protocol = MediaProtocol.Http,
-                    Container = "mp4",
+                    Container = isHls ? "m3u8" : "mp4",
                     Bitrate = 8000000,
                     IsRemote = true,
                     SupportsDirectPlay = true,
                     SupportsDirectStream = true,
                     SupportsTranscoding = true,
-                    SupportsProbing = false
+                    SupportsProbing = true
                 });
             }
             catch (Exception ex)

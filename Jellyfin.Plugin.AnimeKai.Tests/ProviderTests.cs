@@ -76,7 +76,8 @@ public class ProviderTests
             strmFiles.Should().HaveCount(72);
 
             var sampleStrm = await File.ReadAllTextAsync(strmFiles[0], ct);
-            sampleStrm.Should().StartWith("https://");
+            sampleStrm.Should().StartWith("http://consumet-proxy:3000/anime/narutokai/stream/");
+            sampleStrm.Should().EndWith("/master.m3u8");
 
             var rawBytes = await File.ReadAllBytesAsync(strmFiles[0], ct);
             var hasBom = rawBytes.Length >= 3 && rawBytes[0] == 0xEF && rawBytes[1] == 0xBB && rawBytes[2] == 0xBF;
@@ -117,6 +118,10 @@ public class ProviderTests
             File.Exists(Path.Combine(showDir, "tvshow.nfo")).Should().BeTrue();
             var strmFiles = Directory.GetFiles(showDir, "*.strm", SearchOption.AllDirectories);
             strmFiles.Should().HaveCount(36);
+
+            var sampleStrm = await File.ReadAllTextAsync(strmFiles[0], ct);
+            sampleStrm.Should().StartWith("http://consumet-proxy:3000/anime/bleachkai/stream/");
+            sampleStrm.Should().EndWith("/master.m3u8");
 
             var rawBytes = await File.ReadAllBytesAsync(strmFiles[0], ct);
             var hasBom = rawBytes.Length >= 3 && rawBytes[0] == 0xEF && rawBytes[1] == 0xBB && rawBytes[2] == 0xBF;
