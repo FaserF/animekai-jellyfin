@@ -236,7 +236,8 @@ public class RezeroStreamProvider : IAnimeStreamProvider
         var sources = new List<MediaSourceInfo>();
         var hlsBase = EnsureTrailingSlash(config.HlsBaseUrl, "https://media.rezeroperfect.run/HLS/");
         var downloadsBase = EnsureTrailingSlash(config.DownloadsBaseUrl, "https://media.rezeroperfect.run/downloads/");
-        var isDirectMp4Preferred = string.Equals(config.StreamFormat, "direct_mp4", StringComparison.OrdinalIgnoreCase);
+        var isDirectMp4Preferred = !string.Equals(config.StreamFormat, "hls_auto", StringComparison.OrdinalIgnoreCase) &&
+                                   !string.Equals(config.StreamFormat, "hls_m3u8", StringComparison.OrdinalIgnoreCase);
 
         for (var i = 0; i < variants.Length; i++)
         {
@@ -399,6 +400,40 @@ public class RezeroStreamProvider : IAnimeStreamProvider
         if (!string.IsNullOrWhiteSpace(config.TargetSeriesPath) && Directory.Exists(config.TargetSeriesPath))
         {
             return config.TargetSeriesPath;
+        }
+
+        // Auto-detect existing Re:Zero series directory across common TV locations
+        var commonRoots = new[] { "/data/tv", "/data/Serien", "/tv", "/media/tv" };
+        foreach (var r in commonRoots)
+        {
+            var candidate = Path.Combine(r, "Re - ZERO, Starting Life in Another World");
+            if (Directory.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        try
+        {
+            var folders = _libraryManager.GetVirtualFolders();
+            foreach (var vf in folders)
+            {
+                if (string.Equals(vf.CollectionType?.ToString(), "tvshows", StringComparison.OrdinalIgnoreCase))
+                {
+                    foreach (var loc in vf.Locations)
+                    {
+                        var candidate = Path.Combine(loc, "Re - ZERO, Starting Life in Another World");
+                        if (Directory.Exists(candidate))
+                        {
+                            return candidate;
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Could not inspect virtual folders for Re:Zero series directory");
         }
 
         return Path.Combine(storageRoot, "Re - ZERO, Starting Life in Another World");

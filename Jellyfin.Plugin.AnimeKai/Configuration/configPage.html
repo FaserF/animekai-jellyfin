@@ -119,9 +119,9 @@
                             <div class="selectContainer">
                                 <label class="selectLabel" for="selectStreamFormat">Primary Stream URL Format</label>
                                 <select is="emby-select" id="selectStreamFormat" name="StreamFormat" class="emby-select">
-                                    <option value="hls_direct">Fast Direct 1080p HLS Stream (index.m3u8 &mdash; Instant start)</option>
+                                    <option value="direct_mp4">Direct 1080p MP4 URL (Single file stream &mdash; Recommended)</option>
                                     <option value="hls_auto">Adaptive Multi-Variant HLS Master (index.m3u8)</option>
-                                    <option value="direct_mp4">Direct 1080p MP4 URL (Single file stream)</option>
+                                    <option value="hls_direct">Direct HLS Stream (index.m3u8)</option>
                                 </select>
                             </div>
 
@@ -359,7 +359,7 @@
                     page.querySelector("#txtTargetSeriesPath").value = config.TargetSeriesPath || "";
                     page.querySelector("#txtStandaloneLibraryPath").value = config.StandaloneLibraryPath || "";
                     page.querySelector("#selectSyncMode").value = config.SyncMode || "Stream";
-                    page.querySelector("#selectStreamFormat").value = config.StreamFormat || "hls_direct";
+                    page.querySelector("#selectStreamFormat").value = config.StreamFormat || "direct_mp4";
                     page.querySelector("#selectPreferredLanguage").value = config.PreferredLanguage || "jp";
                     page.querySelector("#selectPreferredCaptions").value = config.PreferredCaptions || "cc";
                     page.querySelector("#txtApiBaseUrl").value = config.ApiBaseUrl || "https://rezeroperfect.run/";

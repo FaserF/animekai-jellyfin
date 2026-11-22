@@ -137,10 +137,16 @@ public class PluginConfiguration : BasePluginConfiguration
     /// </summary>
     public string PreferredQuality { get; set; } = "1080p";
 
+    private string _streamFormat = "direct_mp4";
+
     /// <summary>
-    /// Gets or sets the stream format ("hls_direct" [Default, instant single-variant HLS], "hls_auto" [Adaptive bitrate master], or "direct_mp4").
+    /// Gets or sets the stream format ("direct_mp4" [Default, direct seekable 1080p MP4], "hls_auto" [Adaptive bitrate master], or "hls_direct").
     /// </summary>
-    public string StreamFormat { get; set; } = "hls_direct";
+    public string StreamFormat
+    {
+        get => string.Equals(_streamFormat, "hls_direct", StringComparison.OrdinalIgnoreCase) ? "direct_mp4" : _streamFormat;
+        set => _streamFormat = string.IsNullOrWhiteSpace(value) || string.Equals(value, "hls_direct", StringComparison.OrdinalIgnoreCase) ? "direct_mp4" : value;
+    }
 
     /// <summary>
     /// Gets or sets the API base URL.

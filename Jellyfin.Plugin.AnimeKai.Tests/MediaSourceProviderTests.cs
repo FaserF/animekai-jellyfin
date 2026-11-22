@@ -49,11 +49,12 @@ public class MediaSourceProviderTests
 
         sources[0].Name.Should().Contain("Japanese");
         sources[0].SupportsDirectPlay.Should().BeTrue();
-        sources[0].Path.Should().Contain("auto");
-        sources[0].Path.Should().Contain("JP%20BURNED%20CC");
+        sources[0].Path.Should().Contain("downloads");
+        sources[0].Path.Should().Contain("JP%20BURNED%20CC.mp4");
+        sources[0].Container.Should().Be("mp4");
         sources[0].MediaStreams.Should().Contain(s => s.Type == MediaStreamType.Subtitle && s.Language == "eng");
 
-        sources.Should().Contain(s => s.Name.Contains("Clean") && s.Path.Contains("JP/index.m3u8"));
+        sources.Should().Contain(s => s.Name.Contains("Clean") && s.Path.Contains("JP.mp4"));
         sources.Should().Contain(s => s.Name.Contains("English Dub"));
     }
 
@@ -109,8 +110,8 @@ public class MediaSourceProviderTests
             var sources = (await provider.GetMediaSourcesAsync(episode, TestContext.Current.CancellationToken)).ToList();
 
             sources.Should().HaveCount(4);
-            sources.Should().Contain(s => s.Path == "https://media.rezeroperfect.run/HLS/ARC%2003/EP%204/auto/ARC%2003%20-%20EP%204%20-%20EN/index.m3u8");
-            sources.Should().Contain(s => s.Path == "https://media.rezeroperfect.run/HLS/ARC%2003/EP%204/auto/ARC%2003%20-%20EP%204%20-%20JP/index.m3u8");
+            sources.Should().Contain(s => s.Path == "https://media.rezeroperfect.run/downloads/ARC%2003/EP%204/ARC%2003%20-%20EP%204%20-%20EN.mp4");
+            sources.Should().Contain(s => s.Path == "https://media.rezeroperfect.run/downloads/ARC%2003/EP%204/ARC%2003%20-%20EP%204%20-%20JP.mp4");
         }
         finally
         {

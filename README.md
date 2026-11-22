@@ -91,7 +91,7 @@ On a fresh install, all external providers default to `false` until enabled by t
 | `EnableRezero` | `bool` | `false` | Enables Re:Zero - The Perfect Run synchronization. |
 | `IntegrationMode` | `string` | `"SpecialSeason"` | `"SpecialSeason"` (Season 00 in existing show) or `"StandaloneSeries"`. |
 | `SyncMode` | `string` | `"Stream"` | `"Stream"` (.strm pointers) or `"Download"` (HTTPS MP4 downloads). |
-| `StreamFormat` | `string` | `"hls_direct"` | `"hls_direct"` (instant single-variant playback, <1.5s), `"hls_auto"` (adaptive multi-variant master), or `"direct_mp4"`. |
+| `StreamFormat` | `string` | `"direct_mp4"` | `"direct_mp4"` (instant seekable direct 1080p stream), `"hls_auto"` (adaptive multi-variant master), or `"hls_direct"`. |
 | `PreferredLanguage` | `string` | `"jp"` | `"jp"` (Japanese original) or `"en"` (English dub). |
 | `PreferredCaptions` | `string` | `"cc"` | `"cc"` (burned-in CC) or `"clean"` (no hardsubs). |
 

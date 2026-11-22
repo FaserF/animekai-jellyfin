@@ -151,8 +151,10 @@ public class RezeroApiClient : IRezeroApiClient
         var hlsBase = EnsureTrailingSlash(Plugin.Instance?.Configuration?.HlsBaseUrl, DefaultHlsBaseUrl);
         var downloadsBase = EnsureTrailingSlash(Plugin.Instance?.Configuration?.DownloadsBaseUrl, DefaultDownloadsBaseUrl);
 
-        // Direct MP4 requested
-        if (string.Equals(format, "direct_mp4", StringComparison.OrdinalIgnoreCase))
+        // Direct MP4 requested or default
+        if (string.Equals(format, "direct_mp4", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(format, "hls_direct", StringComparison.OrdinalIgnoreCase) ||
+            string.IsNullOrWhiteSpace(format))
         {
             if (BuildDirectMp4Url(relativePath, downloadsBase) is { } directMp4Url)
             {
@@ -163,8 +165,7 @@ public class RezeroApiClient : IRezeroApiClient
         // HLS Auto requested (adaptive bitrate master playlist)
         if (string.Equals(format, "hls_auto", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(quality, "auto", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(format, "hls", StringComparison.OrdinalIgnoreCase) ||
-            string.IsNullOrWhiteSpace(format))
+            string.Equals(format, "hls", StringComparison.OrdinalIgnoreCase))
         {
             var autoPath = Regex.Replace(relativePath, @"/(1080p|720p|480p)/", "/auto/", RegexOptions.IgnoreCase);
             return autoPath.StartsWith("http", StringComparison.OrdinalIgnoreCase)
