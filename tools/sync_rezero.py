@@ -12,7 +12,6 @@ Usage:
 """
 
 import argparse
-import html
 import json
 import os
 import re

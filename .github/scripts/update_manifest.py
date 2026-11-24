@@ -27,7 +27,7 @@ def update_meta_file(meta_path: str, version: str, changelog: str, now_iso: str)
         print(f"Error: {meta_path} not found", file=sys.stderr)
         sys.exit(1)
 
-    with open(meta_path, "r", encoding="utf-8") as f:
+    with open(meta_path, encoding="utf-8") as f:
         meta = json.load(f)
 
     meta["version"] = version
@@ -55,12 +55,12 @@ def main():
 
     changelog = ""
     if args.changelog_file and os.path.exists(args.changelog_file):
-        with open(args.changelog_file, "r", encoding="utf-8") as f:
+        with open(args.changelog_file, encoding="utf-8") as f:
             changelog = f.read().strip()
     if not changelog:
         changelog = f"Release {args.version}"
 
-    now_iso = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    now_iso = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     if args.update_meta:
         update_meta_file(args.update_meta, args.version, changelog, now_iso)
@@ -77,7 +77,7 @@ def main():
     tag = args.tag.strip() or f"v{args.version}"
     source_url = f"https://github.com/{args.repo}/releases/download/{tag}/animekai.zip"
 
-    with open(args.manifest_path, "r", encoding="utf-8") as f:
+    with open(args.manifest_path, encoding="utf-8") as f:
         manifest = json.load(f)
 
     target_abis = ["12.0.0.0", "10.10.0.0"]
