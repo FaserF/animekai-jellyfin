@@ -1,26 +1,21 @@
-backend:
-  - changed-files:
-      - any-glob-to-any-file:
-          - 'Jellyfin.Plugin.AnimeKai/**/*.cs'
-          - 'Jellyfin.Plugin.AnimeKai/Jellyfin.Plugin.AnimeKai.csproj'
+# Pull Request Labeler configuration
+enhancement:
+  - head-branch: ['^feat/', '^feature/']
 
-frontend:
-  - changed-files:
-      - any-glob-to-any-file:
-          - 'Jellyfin.Plugin.AnimeKai/Configuration/**/*.html'
+bug:
+  - head-branch: ['^fix/', '^bugfix/']
 
-tests:
-  - changed-files:
-      - any-glob-to-any-file:
-          - 'Jellyfin.Plugin.AnimeKai.Tests/**/*'
-
-ci-cd:
-  - changed-files:
-      - any-glob-to-any-file:
-          - '.github/**/*'
+dependencies:
+  - head-branch: ['^renovate/', '^deps/']
 
 documentation:
   - changed-files:
-      - any-glob-to-any-file:
-          - '*.md'
-          - 'docs/**/*'
+    - any-glob-to-any-file: ['**/*.md', 'docs/**']
+
+ci:
+  - changed-files:
+    - any-glob-to-any-file: ['.github/**', 'scripts/**']
+
+tests:
+  - changed-files:
+    - any-glob-to-any-file: ['tests/**', '**/*test*']
