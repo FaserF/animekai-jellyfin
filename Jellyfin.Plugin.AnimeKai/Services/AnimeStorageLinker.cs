@@ -395,6 +395,7 @@ internal static class AnimeStorageLinker
             var cleaned = 0;
             foreach (var baseItem in items)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (baseItem is not Episode ep || string.IsNullOrWhiteSpace(ep.Path))
                 {
                     continue;
@@ -455,6 +456,10 @@ internal static class AnimeStorageLinker
             {
                 logger.LogInformation("Sanitized {Count} Season 00 episodes (removed TVDB mid-season injection flags and locked metadata).", cleaned);
             }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {

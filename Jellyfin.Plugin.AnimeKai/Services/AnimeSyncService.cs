@@ -72,7 +72,12 @@ public class AnimeSyncService : IAnimeSyncService
             try
             {
                 _logger.LogInformation("Executing sync for provider: {Name} ({Id})...", provider.DisplayName, provider.ProviderId);
-                var res = await provider.SyncEpisodesAsync(context, null, cancellationToken).ConfigureAwait(false);
+                var providerIndex = i;
+                var providerCount = activeProviders.Count;
+                IProgress<double>? providerProgress = progress != null
+                    ? new Progress<double>(p => progress.Report((providerIndex + Math.Clamp(p, 0.0, 100.0) / 100.0) / providerCount * 100.0))
+                    : null;
+                var res = await provider.SyncEpisodesAsync(context, providerProgress, cancellationToken).ConfigureAwait(false);
                 results.Add(res);
                 if (res.Success)
                 {

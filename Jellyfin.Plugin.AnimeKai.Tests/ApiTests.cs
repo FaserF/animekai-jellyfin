@@ -214,4 +214,15 @@ public class ApiTests
         manifest.Arcs.Should().ContainKey("ARC 01");
         manifest.Episodes["ARC 01/EP 1"].Size.Should().Be(1346836127);
     }
+
+    [Fact]
+    public async Task RezeroApiClient_GetArcEpisodesAsync_ShouldPropagateCancellation()
+    {
+        var client = new RezeroApiClient(new System.Net.Http.HttpClient(), NullLogger<RezeroApiClient>.Instance);
+        using var cts = new System.Threading.CancellationTokenSource();
+        cts.Cancel();
+
+        var act = async () => await client.GetArcEpisodesAsync("arc01", cts.Token);
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
 }

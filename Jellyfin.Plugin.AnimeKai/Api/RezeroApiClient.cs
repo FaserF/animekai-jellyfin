@@ -53,6 +53,10 @@ public class RezeroApiClient : IRezeroApiClient
             var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
             return JsonSerializer.Deserialize<VideosResponse>(json, _jsonOptions);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to retrieve arcs from videos.json");
@@ -72,6 +76,10 @@ public class RezeroApiClient : IRezeroApiClient
             var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
             return JsonSerializer.Deserialize<EpisodeDataResponse>(json, _jsonOptions);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to retrieve episode data for arc '{ArcId}'", arcId);
@@ -89,6 +97,10 @@ public class RezeroApiClient : IRezeroApiClient
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
             return JsonSerializer.Deserialize<UpdatesResponse>(json, _jsonOptions);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -108,6 +120,10 @@ public class RezeroApiClient : IRezeroApiClient
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
             return JsonSerializer.Deserialize<TorrentManifestDto>(json, _jsonOptions);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
